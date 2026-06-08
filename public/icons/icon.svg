@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="100" fill="#1e293b"/>
+
+  <!-- Gradient overlay -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0ea5e9;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Gear / cog icon centered -->
+  <g transform="translate(256,256)">
+    <!-- Outer gear ring -->
+    <circle r="110" fill="none" stroke="url(#grad)" stroke-width="28"/>
+
+    <!-- Gear teeth -->
+    <rect x="-18" y="-138" width="36" height="36" rx="6" fill="url(#grad)"/>
+    <rect x="-18" y="102" width="36" height="36" rx="6" fill="url(#grad)"/>
+    <rect x="102" y="-18" width="36" height="36" rx="6" fill="url(#grad)"/>
+    <rect x="-138" y="-18" width="36" height="36" rx="6" fill="url(#grad)"/>
+
+    <!-- Diagonal teeth -->
+    <rect x="54" y="-130" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(45 72 -112)"/>
+    <rect x="-90" y="-130" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(-45 -72 -112)"/>
+    <rect x="54" y="94" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(-45 72 112)"/>
+    <rect x="-90" y="94" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(45 -72 112)"/>
+
+    <!-- Inner circle -->
+    <circle r="68" fill="#0f172a"/>
+    <circle r="48" fill="url(#grad)" opacity="0.9"/>
+    <circle r="28" fill="#0f172a"/>
+    <circle r="14" fill="url(#grad)"/>
+  </g>
+
+  <!-- EC text -->
+  <text x="256" y="460" text-anchor="middle" font-family="system-ui,sans-serif" font-size="42" font-weight="800" fill="#a5b4fc" letter-spacing="4">EQUIPCARE</text>
+</svg>

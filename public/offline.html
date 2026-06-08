@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>EquipCare Pro — Offline</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      font-family: system-ui, sans-serif; color: #f1f5f9; text-align: center; padding: 24px; }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h1 { font-size: 24px; font-weight: 800; color: #a5b4fc; margin-bottom: 12px; }
+    p { color: #94a3b8; font-size: 15px; line-height: 1.6; max-width: 320px; margin: 0 auto 24px; }
+    button { padding: 14px 28px; border-radius: 10px; border: none; cursor: pointer;
+      background: linear-gradient(135deg, #6366f1, #0ea5e9); color: #fff;
+      font-size: 15px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="icon">⚙️</div>
+    <h1>Sem conexão</h1>
+    <p>O EquipCare Pro precisa de internet para carregar os dados. Verifique sua conexão e tente novamente.</p>
+    <button onclick="location.reload()">🔄 Tentar novamente</button>
+  </div>
+</body>
+</html>
