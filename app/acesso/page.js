@@ -125,10 +125,10 @@ export default function AcessoPage() {
           <hr/>
 
           <div className="info">
-            <div className="info-t">✉️ Primeiro Acesso</div>
+            <div className="info-t">👤 Primeiro Acesso — Como se cadastrar</div>
             <div className="info-x">
-              O administrador envia um <strong>convite por e-mail</strong> pelo sistema.<br/>
-              Clique em <strong>&quot;Ativar Meu Acesso&quot;</strong>, crie sua senha e o sistema estará disponível em todos os dispositivos!
+              Abra o sistema → clique na aba <strong>&quot;✏️ Criar Conta&quot;</strong> → preencha seu nome, e-mail e senha → pronto!<br/><br/>
+              Novos usuários entram como <strong>Operador</strong>. O administrador pode alterar o perfil depois.
             </div>
           </div>
 
