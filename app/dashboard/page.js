@@ -228,15 +228,27 @@ export default function Dashboard() {
     return {Entrega:'#10b981',Retirada:'#f59e0b',Manutenção:'#6366f1',Instalação:'#0ea5e9',Treinamento:'#8b5cf6'}[type]||'#6366f1'
   }
 
+  const RAFAEL_ID = '5a4b91a1-8cb1-45fe-b4dc-b0da4dd0fe48'
+
+  async function deleteUser(profileId, profileName) {
+    if (profileId === RAFAEL_ID) { showToast('O administrador Rafael não pode ser excluído.', true); return }
+    if (!confirm(`Excluir o usuário "${profileName}"? Esta ação não pode ser desfeita.`)) return
+    // Delete from profiles (auth user deletion requires service role - mark inactive instead)
+    await db.profiles.update(profileId, { status: 'Inativo', role: 'Visualizador' })
+    await getClient().from('profiles').delete().eq('id', profileId)
+    await addAudit('Exclusão', 'Usuários', `Usuário ${profileName} excluído`)
+    reload(); showToast(`Usuário ${profileName} excluído!`)
+  }
+
   if (loading) return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#0f172a',color:'#94a3b8',fontFamily:'system-ui'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#f1f5f9',color:'#475569',fontFamily:'system-ui'}}>
       <div style={{textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'16px'}}>⚙️</div><p>Carregando dados...</p></div>
     </div>
   )
 
   // ── RENDER ─────────────────────────────────────────────
   return (
-    <div style={{fontFamily:'Segoe UI,system-ui,sans-serif',background:'#0f172a',minHeight:'100vh',color:'#f1f5f9'}}>
+    <div style={{fontFamily:'Segoe UI,system-ui,sans-serif',background:'#f1f5f9',minHeight:'100vh',color:'#1e293b'}}>
       <style>{CSS}</style>
 
       {/* SIDEBAR */}
@@ -625,6 +637,7 @@ export default function Dashboard() {
                       <td><span className={`badge badge-${p.status==='Ativo'?'success':'danger'}`}>{p.status}</span></td>
                       <td>
                         <button className="btn btn-outline btn-sm" onClick={()=>{setForm({id:p.id,name:p.name,role:p.role,unit:p.unit,status:p.status});setModal('editProfile')}}>✏️</button>
+                        {p.id !== RAFAEL_ID && <button className="btn btn-danger btn-sm" style={{marginLeft:'4px'}} onClick={()=>deleteUser(p.id, p.name)}>🗑</button>}
                       </td>
                     </tr>
                   ))}
@@ -854,12 +867,12 @@ export default function Dashboard() {
 // ── Sub-components ──────────────────────────────────────────
 function KPI({ icon, value, label, sub, color }) {
   return (
-    <div style={{background:'#1e293b',border:'1px solid #334155',borderRadius:'12px',padding:'20px',position:'relative',overflow:'hidden'}}>
+    <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'20px',position:'relative',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.05)'}}>
       <div style={{position:'absolute',top:0,left:0,right:0,height:'3px',background:color}}/>
-      <div style={{width:'44px',height:'44px',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',marginBottom:'12px',background:color+'22'}}>{icon}</div>
-      <div style={{fontSize:'28px',fontWeight:'800',lineHeight:'1'}}>{value}</div>
-      <div style={{fontSize:'13px',fontWeight:'600',color:'#94a3b8',marginTop:'4px'}}>{label}</div>
-      <div style={{fontSize:'11px',color:'#64748b',marginTop:'2px'}}>{sub}</div>
+      <div style={{width:'44px',height:'44px',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',marginBottom:'12px',background:color+'18'}}>{icon}</div>
+      <div style={{fontSize:'28px',fontWeight:'800',lineHeight:'1',color:'#1e293b'}}>{value}</div>
+      <div style={{fontSize:'13px',fontWeight:'600',color:'#475569',marginTop:'4px'}}>{label}</div>
+      <div style={{fontSize:'11px',color:'#94a3b8',marginTop:'2px'}}>{sub}</div>
     </div>
   )
 }
@@ -870,7 +883,7 @@ function Card({ title, sub, children, action }) {
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:'16px'}}>
         <div>
           <div style={{fontSize:'15px',fontWeight:'700'}}>{title}</div>
-          {sub && <div style={{fontSize:'12px',color:'#64748b',marginTop:'2px'}}>{sub}</div>}
+          {sub && <div style={{fontSize:'12px',color:'#94a3b8',marginTop:'2px'}}>{sub}</div>}
         </div>
         {action}
       </div>
@@ -907,8 +920,9 @@ function Empty({ icon, msg }) {
 const CSS = `
   *{box-sizing:border-box}
   ::-webkit-scrollbar{width:6px;height:6px}
-  ::-webkit-scrollbar-track{background:#1e293b}
-  ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+  ::-webkit-scrollbar-track{background:#e2e8f0}
+  ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}
+  /* ── SIDEBAR (dark) ── */
   .sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;background:#1e293b;border-right:1px solid #334155;display:flex;flex-direction:column;z-index:100;transition:transform .3s}
   .sidebar.collapsed{transform:translateX(-260px)}
   .sidebar-header{padding:20px 20px 16px;border-bottom:1px solid #334155;display:flex;align-items:center;gap:12px}
@@ -925,47 +939,49 @@ const CSS = `
   .user-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
   .logout-btn{margin-left:auto;background:none;border:1px solid #334155;border-radius:8px;padding:5px 8px;cursor:pointer;color:#94a3b8;font-size:11px;transition:all .2s}
   .logout-btn:hover{background:#ef4444;color:#fff;border-color:#ef4444}
-  .app-header{position:fixed;top:0;left:260px;right:0;height:64px;background:rgba(30,41,59,.95);backdrop-filter:blur(12px);border-bottom:1px solid #334155;display:flex;align-items:center;padding:0 24px;gap:16px;z-index:90;transition:left .3s}
+  /* ── HEADER (light) ── */
+  .app-header{position:fixed;top:0;left:260px;right:0;height:64px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 24px;gap:16px;z-index:90;transition:left .3s;color:#1e293b}
   .app-header.full{left:0}
-  .toggle-btn{background:none;border:1px solid #334155;border-radius:8px;padding:6px 10px;cursor:pointer;color:#94a3b8;font-size:16px;transition:all .2s;flex-shrink:0}
-  .toggle-btn:hover{background:#334155;color:#f1f5f9}
-  .header-search{margin-left:auto;display:flex;align-items:center;gap:8px;background:#334155;border:1px solid #334155;border-radius:10px;padding:8px 14px}
-  .notif-btn{background:none;border:1px solid #334155;border-radius:10px;padding:8px 12px;cursor:pointer;color:#94a3b8;font-size:16px;position:relative;transition:all .2s}
-  .notif-btn:hover{background:#334155}
-  .notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #1e293b}
-  .app-main{margin-left:260px;margin-top:64px;padding:28px;transition:margin-left .3s;min-height:calc(100vh - 64px)}
+  .toggle-btn{background:none;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer;color:#64748b;font-size:16px;transition:all .2s;flex-shrink:0}
+  .toggle-btn:hover{background:#f1f5f9;color:#1e293b}
+  .header-search{margin-left:auto;display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px}
+  .notif-btn{background:none;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;cursor:pointer;color:#64748b;font-size:16px;position:relative;transition:all .2s}
+  .notif-btn:hover{background:#f1f5f9}
+  .notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #fff}
+  /* ── MAIN AREA (light) ── */
+  .app-main{margin-left:260px;margin-top:64px;padding:28px;transition:margin-left .3s;min-height:calc(100vh - 64px);background:#f1f5f9;color:#1e293b}
   .app-main.full{margin-left:0}
   .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
-  .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin-bottom:20px}
+  .card{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
   .search-bar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-  .search-input{padding:9px 14px;border-radius:9px;background:#334155;border:1px solid #334155;color:#f1f5f9;font-size:13px;outline:none;flex:1;min-width:160px}
+  .search-input{padding:9px 14px;border-radius:9px;background:#fff;border:1px solid #e2e8f0;color:#1e293b;font-size:13px;outline:none;flex:1;min-width:160px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
   .search-input:focus{border-color:#6366f1}
   .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;text-decoration:none}
   .btn-primary{background:#6366f1;color:#fff}
   .btn-primary:hover{background:#4f46e5}
   .btn-warning{background:#f59e0b;color:#fff}
   .btn-danger{background:#ef4444;color:#fff}
-  .btn-outline{background:transparent;border:1px solid #334155;color:#94a3b8}
-  .btn-outline:hover{background:#334155;color:#f1f5f9}
+  .btn-outline{background:transparent;border:1px solid #e2e8f0;color:#64748b}
+  .btn-outline:hover{background:#f1f5f9;color:#1e293b}
   .btn-sm{padding:5px 10px;font-size:12px}
   .table-wrap{overflow-x:auto;border-radius:10px}
   table{width:100%;border-collapse:collapse}
-  thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b;background:#0f172a;border-bottom:1px solid #334155}
-  tbody tr{border-bottom:1px solid rgba(51,65,85,.5);transition:background .15s}
-  tbody tr:hover{background:#253347}
+  thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+  tbody tr{border-bottom:1px solid #f1f5f9;transition:background .15s;color:#1e293b}
+  tbody tr:hover{background:#f8fafc}
   tbody td{padding:13px 16px;font-size:13px}
-  td.muted{color:#94a3b8}
+  td.muted{color:#64748b}
   .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
-  .badge-success{background:rgba(16,185,129,.15);color:#34d399}
-  .badge-warning{background:rgba(245,158,11,.15);color:#fbbf24}
-  .badge-danger{background:rgba(239,68,68,.15);color:#f87171}
-  .badge-blue{background:rgba(14,165,233,.15);color:#38bdf8}
-  .badge-info{background:rgba(139,92,246,.15);color:#a78bfa}
-  .badge-gray{background:rgba(100,116,139,.15);color:#94a3b8}
-  .tabs{display:flex;gap:4px;margin-bottom:20px;background:#0f172a;padding:4px;border-radius:10px;width:fit-content}
-  .tab-btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#94a3b8;background:transparent;transition:all .2s}
-  .tab-btn.active{background:#1e293b;color:#f1f5f9;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .badge-success{background:rgba(16,185,129,.12);color:#059669}
+  .badge-warning{background:rgba(245,158,11,.12);color:#d97706}
+  .badge-danger{background:rgba(239,68,68,.12);color:#dc2626}
+  .badge-blue{background:rgba(14,165,233,.12);color:#0284c7}
+  .badge-info{background:rgba(139,92,246,.12);color:#7c3aed}
+  .badge-gray{background:rgba(100,116,139,.12);color:#475569}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;background:#e2e8f0;padding:4px;border-radius:10px;width:fit-content}
+  .tab-btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;background:transparent;transition:all .2s}
+  .tab-btn.active{background:#fff;color:#1e293b;box-shadow:0 2px 8px rgba(0,0,0,.1)}
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
   .modal{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,.6)}
   .modal h2{font-size:18px;font-weight:700;margin-bottom:20px;color:#a5b4fc}
