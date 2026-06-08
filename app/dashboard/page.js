@@ -339,10 +339,10 @@ export default function Dashboard() {
                   </div>
                 })}
               </Card>
-              <Card title="📍 Distribuição por Unidade" sub="Equipamentos por localização">
+              <Card title="📍 Distribuição por Unidade" sub="Equipamentos por unidade da rede">
                 {(() => {
                   const units = {}
-                  equipment.forEach(e => { units[e.location||'—'] = (units[e.location||'—']||0)+1 })
+                  equipment.forEach(e => { units[e.unit||'Sem unidade'] = (units[e.unit||'Sem unidade']||0)+1 })
                   const max = Math.max(...Object.values(units),1)
                   return Object.entries(units).length ? Object.entries(units).map(([u,c])=>(
                     <div key={u} style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'12px'}}>
@@ -392,11 +392,11 @@ export default function Dashboard() {
               <div className="table-wrap">
                 <table><thead><tr>
                   <th>Equipamento</th><th>Nº de Série</th><th>Tipo</th>
-                  <th>Localização</th><th>Disponibilidade</th><th>Status</th><th>Ações</th>
+                  <th>Unidade</th><th>Localização</th><th>Status</th><th>Ações</th>
                 </tr></thead><tbody>
                   {equipment.filter(e=>{
                     const q = search.toLowerCase()
-                    const matchQ = (e.brand+e.model+e.serial+e.location).toLowerCase().includes(q)
+                    const matchQ = (e.brand+e.model+e.serial+e.location+(e.unit||'')).toLowerCase().includes(q)
                     const matchS = !filters.status || e.status===filters.status
                     const matchT = !filters.type || e.type===filters.type
                     return matchQ && matchS && matchT
@@ -404,17 +404,17 @@ export default function Dashboard() {
                     <tr key={e.id}>
                       <td><strong>{e.brand} {e.model}</strong></td>
                       <td className="muted">{e.serial}</td>
-                      <td><span className="badge badge-blue">{e.type}</span></td>
-                      <td className="muted">{e.location}</td>
-                      <td><span className="badge badge-gray">{e.availability}</span></td>
+                      <td><span className="badge badge-blue">{e.type||'—'}</span></td>
+                      <td className="muted">{e.unit||'—'}</td>
+                      <td className="muted">{e.location||'—'}</td>
                       <td><Badge status={e.status}/></td>
                       <td>
-                        <button className="btn btn-outline btn-sm" onClick={()=>{setForm({id:e.id,brand:e.brand,model:e.model,serial:e.serial,type:e.type,location:e.location,availability:e.availability,status:e.status,acquisition_date:e.acquisition_date,notes:e.notes});setModal('equip')}}>✏️</button>
+                        <button className="btn btn-outline btn-sm" onClick={()=>{setForm({id:e.id,brand:e.brand,model:e.model,serial:e.serial,type:e.type,unit:e.unit,location:e.location,availability:e.availability,status:e.status,acquisition_date:e.acquisition_date,notes:e.notes});setModal('equip')}}>✏️</button>
                         <button className="btn btn-danger btn-sm" style={{marginLeft:'4px'}} onClick={()=>deleteEquipment(e.id,`${e.brand} ${e.model}`)}>🗑</button>
                       </td>
                     </tr>
                   ))}
-                  {equipment.length===0 && <tr><td colSpan="7" style={{textAlign:'center',padding:'32px',color:'#64748b'}}>Nenhum equipamento cadastrado.</td></tr>}
+                  {equipment.length===0 && <tr><td colSpan="7" style={{textAlign:'center',padding:'32px',color:'#64748b'}}>Nenhum equipamento cadastrado. Clique em ➕ para adicionar.</td></tr>}
                 </tbody></table>
               </div>
             </div>
