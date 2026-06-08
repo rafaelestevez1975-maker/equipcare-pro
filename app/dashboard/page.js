@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase, signOut, db } from '@/lib/supabase'
+import { getClient, signOut, db } from '@/lib/supabase'
 
 // ─── helpers ───────────────────────────────────────────────
 const fmt = (v) => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2})
@@ -46,12 +46,12 @@ export default function Dashboard() {
 
   // ── Auth ───────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getClient().auth.getSession().then(({ data: { session } }) => {
       if (!session) { router.replace('/login'); return }
       setUser(session.user)
       loadAll(session.user)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = getClient().auth.onAuthStateChange((event, session) => {
       if (!session) router.replace('/login')
     })
     return () => subscription.unsubscribe()
@@ -73,7 +73,7 @@ export default function Dashboard() {
     setAuditLog(au.data || [])
     setProfiles(pr.data || [])
     // load own profile
-    const { data: prof } = await supabase.from('profiles').select('*').eq('id', u.id).single()
+    const { data: prof } = await getClient().from('profiles').select('*').eq('id', u.id).single()
     setProfile(prof)
     setLoading(false)
   }

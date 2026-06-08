@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { getClient } from '@/lib/supabase'
 
 function InviteForm() {
   const router = useRouter()
@@ -15,7 +15,7 @@ function InviteForm() {
 
   useEffect(() => {
     // Supabase puts the token in the URL hash for invites
-    supabase.auth.getUser().then(({ data }) => {
+    getClient().auth.getUser().then(({ data }) => {
       if (data?.user?.user_metadata?.name) setName(data.user.user_metadata.name)
     })
   }, [])
@@ -25,7 +25,7 @@ function InviteForm() {
     if (pass !== pass2) { setError('As senhas não coincidem.'); return }
     if (pass.length < 6) { setError('Senha deve ter pelo menos 6 caracteres.'); return }
     setLoading(true)
-    const { error } = await supabase.auth.updateUser({ password: pass })
+    const { error } = await getClient().auth.updateUser({ password: pass })
     if (error) { setError(error.message); setLoading(false) }
     else router.replace('/dashboard')
   }
