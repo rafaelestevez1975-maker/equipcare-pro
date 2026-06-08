@@ -1,39 +1,36 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background -->
-  <rect width="512" height="512" rx="100" fill="#1e293b"/>
-
-  <!-- Gradient overlay -->
+  <!-- Fundo arredondado -->
+  <rect width="512" height="512" rx="110" fill="#1e293b"/>
+  <!-- Gradiente de fundo interno -->
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#0ea5e9;stop-opacity:1" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="gear" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="laser" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
     </linearGradient>
   </defs>
-
-  <!-- Gear / cog icon centered -->
-  <g transform="translate(256,256)">
-    <!-- Outer gear ring -->
-    <circle r="110" fill="none" stroke="url(#grad)" stroke-width="28"/>
-
-    <!-- Gear teeth -->
-    <rect x="-18" y="-138" width="36" height="36" rx="6" fill="url(#grad)"/>
-    <rect x="-18" y="102" width="36" height="36" rx="6" fill="url(#grad)"/>
-    <rect x="102" y="-18" width="36" height="36" rx="6" fill="url(#grad)"/>
-    <rect x="-138" y="-18" width="36" height="36" rx="6" fill="url(#grad)"/>
-
-    <!-- Diagonal teeth -->
-    <rect x="54" y="-130" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(45 72 -112)"/>
-    <rect x="-90" y="-130" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(-45 -72 -112)"/>
-    <rect x="54" y="94" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(-45 72 112)"/>
-    <rect x="-90" y="94" width="36" height="36" rx="6" fill="url(#grad)" transform="rotate(45 -72 112)"/>
-
-    <!-- Inner circle -->
-    <circle r="68" fill="#0f172a"/>
-    <circle r="48" fill="url(#grad)" opacity="0.9"/>
-    <circle r="28" fill="#0f172a"/>
-    <circle r="14" fill="url(#grad)"/>
+  <!-- Engrenagem grande -->
+  <g transform="translate(256,230)">
+    <path d="M0-90 L15-75 L40-85 L50-65 L35-50 L38-28 L55-20 L55,0 L38,20 L35,42 L50,57 L40,77 L15,67 L0,82 L-15,67 L-40,77 L-50,57 L-35,42 L-38,20 L-55,0 L-55,-20 L-38,-28 L-35,-50 L-50,-65 L-40,-85 L-15,-75 Z" 
+          fill="url(#gear)" opacity="0.9"/>
+    <circle r="35" fill="#0f172a"/>
+    <circle r="22" fill="url(#gear)"/>
+    <!-- Raio laser -->
+    <line x1="-22" y1="0" x2="-90" y2="-40" stroke="url(#laser)" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+    <circle cx="-90" cy="-40" r="10" fill="#38bdf8" opacity="0.7"/>
+    <!-- Ponto brilhante -->
+    <circle cx="-90" cy="-40" r="5" fill="#e0f2fe"/>
   </g>
-
-  <!-- EC text -->
-  <text x="256" y="460" text-anchor="middle" font-family="system-ui,sans-serif" font-size="42" font-weight="800" fill="#a5b4fc" letter-spacing="4">EQUIPCARE</text>
+  <!-- Texto EC -->
+  <text x="256" y="395" font-family="system-ui,sans-serif" font-size="72" font-weight="900" fill="#a5b4fc" text-anchor="middle" letter-spacing="2">EC</text>
+  <!-- Linha decorativa -->
+  <rect x="156" y="410" width="200" height="4" rx="2" fill="url(#laser)" opacity="0.6"/>
 </svg>
