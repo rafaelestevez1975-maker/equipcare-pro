@@ -243,14 +243,14 @@ export default function Dashboard() {
   }
 
   if (loading) return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#f1f5f9',color:'#475569',fontFamily:'system-ui'}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#ffffff',color:'#475569',fontFamily:'system-ui'}}>
       <div style={{textAlign:'center'}}><div style={{fontSize:'48px',marginBottom:'16px'}}>⚙️</div><p>Carregando dados...</p></div>
     </div>
   )
 
   // ── RENDER ─────────────────────────────────────────────
   return (
-    <div style={{fontFamily:'Segoe UI,system-ui,sans-serif',background:'#f1f5f9',minHeight:'100vh',color:'#1e293b'}}>
+    <div style={{fontFamily:'Segoe UI,system-ui,sans-serif',background:'#ffffff',minHeight:'100vh',color:'#1e293b'}}>
       <style>{CSS}</style>
 
       {/* SIDEBAR */}
@@ -530,7 +530,7 @@ export default function Dashboard() {
                   const dateStr = day.cur ? `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day.d).padStart(2,'0')}` : ''
                   const evs = logistics.filter(e=>e.event_date===dateStr)
                   const isToday = day.cur && day.d===now.getDate() && calMonth===now.getMonth() && calYear===now.getFullYear()
-                  return <div key={i} style={{minHeight:'80px',background:isToday?'rgba(99,102,241,.08)':'#f8fafc',border:`1px solid ${isToday?'#6366f1':'#e2e8f0'}`,borderRadius:'8px',padding:'6px',opacity:day.cur?1:.4}}>
+                  return <div key={i} style={{minHeight:'80px',background:isToday?'rgba(99,102,241,.08)':'#ffffff',border:`1px solid ${isToday?'#6366f1':'#e2e8f0'}`,borderRadius:'8px',padding:'6px',opacity:day.cur?1:.4}}>
                     <div style={{fontSize:'12px',fontWeight:'600',color:isToday?'#6366f1':'#64748b'}}>{day.d}</div>
                     {evs.slice(0,2).map(e=><div key={e.id} style={{fontSize:'10px',padding:'2px 4px',borderRadius:'4px',marginTop:'2px',background:calEventColor(e.log_type)+'22',color:calEventColor(e.log_type)}}>{e.log_type}</div>)}
                   </div>
@@ -869,7 +869,7 @@ export default function Dashboard() {
 // ── Sub-components ──────────────────────────────────────────
 function KPI({ icon, value, label, sub, color }) {
   return (
-    <div style={{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'20px',position:'relative',overflow:'hidden',boxShadow:'0 1px 4px rgba(0,0,0,.05)'}}>
+    <div style={{background:'#ffffff',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'20px',position:'relative',overflow:'hidden',boxShadow:'0 2px 8px rgba(0,0,0,.06)'}}>
       <div style={{position:'absolute',top:0,left:0,right:0,height:'3px',background:color}}/>
       <div style={{width:'44px',height:'44px',borderRadius:'12px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'20px',marginBottom:'12px',background:color+'18'}}>{icon}</div>
       <div style={{fontSize:'28px',fontWeight:'800',lineHeight:'1',color:'#1e293b'}}>{value}</div>
@@ -922,7 +922,7 @@ function Empty({ icon, msg }) {
 const CSS = `
   *{box-sizing:border-box}
   ::-webkit-scrollbar{width:6px;height:6px}
-  ::-webkit-scrollbar-track{background:#e2e8f0}
+  ::-webkit-scrollbar-track{background:#f8fafc}
   ::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:3px}
   /* ── SIDEBAR (dark) ── */
   .sidebar{position:fixed;left:0;top:0;bottom:0;width:260px;background:#1e293b;border-right:1px solid #334155;display:flex;flex-direction:column;z-index:100;transition:transform .3s}
@@ -946,12 +946,12 @@ const CSS = `
   .app-header.full{left:0}
   .toggle-btn{background:none;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer;color:#64748b;font-size:16px;transition:all .2s;flex-shrink:0}
   .toggle-btn:hover{background:#f1f5f9;color:#1e293b}
-  .header-search{margin-left:auto;display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px}
+  .header-search{margin-left:auto;display:flex;align-items:center;gap:8px;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px}
   .notif-btn{background:none;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;cursor:pointer;color:#64748b;font-size:16px;position:relative;transition:all .2s}
   .notif-btn:hover{background:#f1f5f9}
   .notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #fff}
-  /* ── MAIN AREA (light) ── */
-  .app-main{margin-left:260px;margin-top:64px;padding:28px;transition:margin-left .3s;min-height:calc(100vh - 64px);background:#f1f5f9;color:#1e293b}
+  /* ── MAIN AREA (white) ── */
+  .app-main{margin-left:260px;margin-top:64px;padding:28px;transition:margin-left .3s;min-height:calc(100vh - 64px);background:#ffffff;color:#1e293b}
   .app-main.full{margin-left:0}
   .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
@@ -969,9 +969,9 @@ const CSS = `
   .btn-sm{padding:5px 10px;font-size:12px}
   .table-wrap{overflow-x:auto;border-radius:10px}
   table{width:100%;border-collapse:collapse}
-  thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+  thead th{padding:12px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#64748b;background:#ffffff;border-bottom:2px solid #e2e8f0}
   tbody tr{border-bottom:1px solid #f1f5f9;transition:background .15s;color:#1e293b}
-  tbody tr:hover{background:#f8fafc}
+  tbody tr:hover{background:#f0f9ff}
   tbody td{padding:13px 16px;font-size:13px}
   td.muted{color:#64748b}
   .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700}
@@ -981,7 +981,7 @@ const CSS = `
   .badge-blue{background:rgba(14,165,233,.12);color:#0284c7}
   .badge-info{background:rgba(139,92,246,.12);color:#7c3aed}
   .badge-gray{background:rgba(100,116,139,.12);color:#475569}
-  .tabs{display:flex;gap:4px;margin-bottom:20px;background:#e2e8f0;padding:4px;border-radius:10px;width:fit-content}
+  .tabs{display:flex;gap:4px;margin-bottom:20px;background:#f1f5f9;padding:4px;border-radius:10px;width:fit-content;border:1px solid #e2e8f0}
   .tab-btn{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;background:transparent;transition:all .2s}
   .tab-btn.active{background:#fff;color:#1e293b;box-shadow:0 2px 8px rgba(0,0,0,.1)}
   .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
