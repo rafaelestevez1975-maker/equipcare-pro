@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>EquipCare Pro — Acesso ao Sistema</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px; color: #f1f5f9;
+    }
+    .card {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 24px; padding: 40px; max-width: 480px;
+      width: 100%; box-shadow: 0 25px 60px rgba(0,0,0,.6);
+    }
+    .header { text-align: center; margin-bottom: 32px; }
+    .logo { font-size: 56px; margin-bottom: 12px; }
+    h1 { font-size: 26px; font-weight: 800; color: #a5b4fc; margin-bottom: 4px; }
+    .sub { color: #64748b; font-size: 13px; }
+    .url-box {
+      background: #0f172a; border: 1px solid #334155; border-radius: 12px;
+      padding: 16px 20px; text-align: center; margin-bottom: 28px;
+    }
+    .url-label { font-size: 11px; font-weight: 700; color: #475569;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+    .url { font-size: 16px; font-weight: 700; color: #a5b4fc;
+      word-break: break-all; margin-bottom: 10px; }
+    .copy-btn {
+      background: #6366f1; color: #fff; border: none; border-radius: 8px;
+      padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background .2s;
+    }
+    .copy-btn:hover { background: #4f46e5; }
+    .qr-section { text-align: center; margin-bottom: 28px; }
+    .qr-label { font-size: 12px; color: #64748b; margin-bottom: 12px; font-weight: 600; }
+    .qr-img { border-radius: 12px; background: #fff; padding: 12px; display: inline-block; }
+    .steps { margin-bottom: 24px; }
+    .step-title {
+      font-size: 12px; font-weight: 700; color: #475569;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px;
+    }
+    .step {
+      display: flex; align-items: flex-start; gap: 12px;
+      margin-bottom: 16px; background: #0f172a; border-radius: 10px; padding: 14px;
+    }
+    .step-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+    .step-text { font-size: 13px; color: #94a3b8; line-height: 1.5; }
+    .step-text strong { color: #f1f5f9; }
+    .divider { border: none; border-top: 1px solid #334155; margin: 20px 0; }
+    .footer { text-align: center; color: #475569; font-size: 11px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(16,185,129,.15); color: #10b981;
+      padding: 4px 12px; border-radius: 999px; font-size: 11px;
+      font-weight: 700; margin-bottom: 16px;
+    }
+    @media print {
+      body { background: #fff; }
+      .card { box-shadow: none; border: 2px solid #334155; }
+      .copy-btn { display: none; }
+    }
+    @media (max-width: 480px) {
+      .card { padding: 28px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="logo">⚙️</div>
+      <h1>EquipCare Pro</h1>
+      <p class="sub">Sistema de Gestão de Máquinas e Equipamentos</p>
+      <br/>
+      <span class="badge">● Sistema Online</span>
+    </div>
+
+    <div class="url-box">
+      <div class="url-label">🔗 Endereço do Sistema</div>
+      <div class="url" id="sysurl">equipcare-pro.vercel.app</div>
+      <button class="copy-btn" onclick="copyUrl()">📋 Copiar Link</button>
+    </div>
+
+    <div class="qr-section">
+      <div class="qr-label">📱 Escaneie para acessar no celular</div>
+      <div class="qr-img">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?data=https://equipcare-pro.vercel.app&size=180x180&color=1e293b&bgcolor=ffffff&qzone=1&margin=0&format=png"
+             alt="QR Code EquipCare Pro" width="180" height="180"/>
+      </div>
+    </div>
+
+    <hr class="divider"/>
+
+    <div class="steps">
+      <div class="step-title">📲 Como instalar como App</div>
+
+      <div class="step">
+        <div class="step-icon">🍎</div>
+        <div class="step-text">
+          <strong>iPhone / iPad</strong><br/>
+          Abra no <strong>Safari</strong> → toque em Compartilhar (↑) → <strong>"Adicionar à Tela de Início"</strong> → Adicionar
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-icon">🤖</div>
+        <div class="step-text">
+          <strong>Android</strong><br/>
+          Abra no <strong>Chrome</strong> → toque em (⋮) → <strong>"Adicionar à tela inicial"</strong> → Adicionar
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-icon">💻</div>
+        <div class="step-text">
+          <strong>Computador (Chrome / Edge)</strong><br/>
+          Abra o link → clique no ícone de instalação (⊕) na barra de endereço → <strong>Instalar</strong>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider"/>
+
+    <div class="steps">
+      <div class="step-title">🔐 Primeiro Acesso</div>
+      <div class="step">
+        <div class="step-icon">✉️</div>
+        <div class="step-text">
+          Você receberá um <strong>e-mail de convite</strong> do endereço <strong>rafael@lasercompany.com</strong>.<br/>
+          Clique em <strong>"Ativar Meu Acesso"</strong>, crie sua senha e pronto — o sistema estará disponível!
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider"/>
+    <div class="footer">
+      EquipCare Pro v2.0 &bull; Laser&Co &bull; Acesso seguro via Supabase
+      <br/><br/>
+      <button onclick="window.print()" style="background:none;border:1px solid #334155;border-radius:8px;padding:6px 14px;color:#64748b;cursor:pointer;font-size:12px;">🖨️ Imprimir / Salvar PDF</button>
+    </div>
+  </div>
+
+  <script>
+    function copyUrl() {
+      navigator.clipboard.writeText('https://equipcare-pro.vercel.app').then(() => {
+        const btn = document.querySelector('.copy-btn')
+        btn.textContent = '✅ Copiado!'
+        btn.style.background = '#10b981'
+        setTimeout(() => { btn.textContent = '📋 Copiar Link'; btn.style.background = '#6366f1' }, 2000)
+      })
+    }
+  </script>
+</body>
+</html>
