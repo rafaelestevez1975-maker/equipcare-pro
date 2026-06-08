@@ -181,21 +181,23 @@ export default function Dashboard() {
     await db.expenses.delete(id); showToast('Despesa removida.'); reload()
   }
 
-  // Invite user
+  // Invite user via Edge Function
   async function inviteUserAction() {
     if (!form.inv_email || !form.inv_name) { showToast('Preencha nome e e-mail.',true); return }
-    // Use Supabase admin API via edge function or direct
-    const { data, error } = await supabase.auth.admin?.inviteUserByEmail?.(form.inv_email, {
-      data: { name: form.inv_name, role: form.inv_role||'Operador', unit: form.inv_unit||'' },
-      redirectTo: `${window.location.origin}/invite`
-    }) || {}
-    if (error) {
-      // fallback: generate a magic link message
-      showToast('Convite enviado! Verifique o e-mail.', false)
-    } else {
-      showToast('Convite enviado com sucesso!')
+    try {
+      const res = await fetch('https://riutcbwillvqjrpaefkb.supabase.co/functions/v1/invite-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdXRjYndpbGx2cWpycGFlZmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NDk0MzksImV4cCI6MjA5MDMyNTQzOX0.WR69xD-_dvkG7dN2EkwerPw0Su8vcStNgnha8Ky0grA' },
+        body: JSON.stringify({ email: form.inv_email, name: form.inv_name, role: form.inv_role||'Operador', unit: form.inv_unit||'' })
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) { showToast(json.error || 'Erro ao enviar convite.', true); return }
+      showToast(`✉️ Convite enviado para ${form.inv_email}!`)
+      setModal(null); reload()
+    } catch(e) {
+      showToast('Erro de conexão ao enviar convite.', true)
     }
-    setModal(null); reload()
   }
 
   // ── Computed ───────────────────────────────────────────
@@ -290,7 +292,7 @@ export default function Dashboard() {
       {/* HEADER */}
       <header className={`app-header${sidebarOpen?'':' full'}`}>
         <button className="toggle-btn" onClick={()=>setSidebarOpen(v=>!v)}>☰</button>
-        <span style={{fontWeight:'700',fontSize:'17px'}}>
+        <span style={{fontWeight:'700',fontSize:'17px',color:'#1e293b'}}>
           {{dashboard:'Dashboard',inventory:'Inventário de Equipamentos',maintenance:'Gestão de Manutenções',
             logistics:'Calendário de Logística',vendors:'Gestão de Fornecedores',financial:'Relatórios Financeiros',
             users:'Gestão de Usuários',audit:'Auditoria de Ações'}[page]}
@@ -298,7 +300,7 @@ export default function Dashboard() {
         <div className="header-search">
           <span style={{color:'#64748b'}}>🔍</span>
           <input placeholder="Buscar equipamento..." value={search} onChange={e=>setSearch(e.target.value)}
-            style={{background:'none',border:'none',outline:'none',color:'#f1f5f9',fontSize:'13px',width:'180px'}}/>
+            style={{background:'none',border:'none',outline:'none',color:'#1e293b',fontSize:'13px',width:'180px'}}/>
         </div>
         <button className="notif-btn" onClick={()=>setPage('maintenance')}>🔔{openOrders>0&&<span className="notif-dot"/>}</button>
       </header>
@@ -322,7 +324,7 @@ export default function Dashboard() {
                   const pct = equipment.length ? Math.round(n/equipment.length*100) : 0
                   return <div key={st} style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'12px'}}>
                     <span style={{width:'90px',fontSize:'12px',color:'#94a3b8'}}>{st}</span>
-                    <div style={{flex:1,background:'#334155',borderRadius:'999px',height:'8px'}}>
+                    <div style={{flex:1,background:'#e2e8f0',borderRadius:'999px',height:'8px'}}>
                       <div style={{width:pct+'%',height:'100%',background:color,borderRadius:'999px',transition:'width .4s'}}/>
                     </div>
                     <span style={{width:'40px',textAlign:'right',fontSize:'12px',fontWeight:'700',color}}>{pct}%</span>
@@ -337,7 +339,7 @@ export default function Dashboard() {
                   return Object.entries(units).length ? Object.entries(units).map(([u,c])=>(
                     <div key={u} style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'12px'}}>
                       <span style={{width:'110px',fontSize:'12px',color:'#94a3b8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u}</span>
-                      <div style={{flex:1,background:'#334155',borderRadius:'999px',height:'8px'}}>
+                      <div style={{flex:1,background:'#e2e8f0',borderRadius:'999px',height:'8px'}}>
                         <div style={{width:Math.round(c/max*100)+'%',height:'100%',background:'#0ea5e9',borderRadius:'999px'}}/>
                       </div>
                       <span style={{width:'24px',textAlign:'right',fontSize:'12px',fontWeight:'700',color:'#0ea5e9'}}>{c}</span>
@@ -348,7 +350,7 @@ export default function Dashboard() {
             </div>
             <Card title="⏱ Timeline de Manutenções">
               {orders.slice(0,6).length ? orders.slice(0,6).map(o=>(
-                <div key={o.id} style={{display:'flex',gap:'16px',paddingBottom:'16px',borderBottom:'1px solid #1e293b'}}>
+                <div key={o.id} style={{display:'flex',gap:'16px',paddingBottom:'16px',borderBottom:'1px solid #e2e8f0'}}>
                   <div style={{width:'36px',height:'36px',borderRadius:'50%',background:statusColor(o.status)+'22',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>🔧</div>
                   <div>
                     <div style={{fontSize:'13px',fontWeight:'600'}}>{eqMap[o.equip_id]||'—'} — {o.type}</div>
@@ -415,7 +417,7 @@ export default function Dashboard() {
         {page==='maintenance' && (
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px',flexWrap:'wrap',gap:'10px'}}>
-              <p style={{fontSize:'13px',color:'#94a3b8',margin:0}}>Gerencie e acompanhe manutenções e preventivas.</p>
+              <p style={{fontSize:'13px',color:'#64748b',margin:0}}>Gerencie e acompanhe manutenções e preventivas.</p>
               <div style={{display:'flex',gap:'8px'}}>
                 <button className="btn btn-outline">📄 Exportar PDF</button>
                 <button className="btn btn-primary" onClick={()=>{setForm({type:'Preventiva',status:'Aberta',open_date:today(),equip_id:equipment[0]?.id||''});setModal('order')}}>➕ Nova OS</button>
@@ -528,8 +530,8 @@ export default function Dashboard() {
                   const dateStr = day.cur ? `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day.d).padStart(2,'0')}` : ''
                   const evs = logistics.filter(e=>e.event_date===dateStr)
                   const isToday = day.cur && day.d===now.getDate() && calMonth===now.getMonth() && calYear===now.getFullYear()
-                  return <div key={i} style={{minHeight:'80px',background:isToday?'rgba(99,102,241,.1)':'#1e293b',border:`1px solid ${isToday?'#6366f1':'#334155'}`,borderRadius:'8px',padding:'6px',opacity:day.cur?1:.4}}>
-                    <div style={{fontSize:'12px',fontWeight:'600',color:isToday?'#a5b4fc':'#94a3b8'}}>{day.d}</div>
+                  return <div key={i} style={{minHeight:'80px',background:isToday?'rgba(99,102,241,.08)':'#f8fafc',border:`1px solid ${isToday?'#6366f1':'#e2e8f0'}`,borderRadius:'8px',padding:'6px',opacity:day.cur?1:.4}}>
+                    <div style={{fontSize:'12px',fontWeight:'600',color:isToday?'#6366f1':'#64748b'}}>{day.d}</div>
                     {evs.slice(0,2).map(e=><div key={e.id} style={{fontSize:'10px',padding:'2px 4px',borderRadius:'4px',marginTop:'2px',background:calEventColor(e.log_type)+'22',color:calEventColor(e.log_type)}}>{e.log_type}</div>)}
                   </div>
                 })}
@@ -645,10 +647,10 @@ export default function Dashboard() {
                 </tbody></table>
               </div>
             </div>
-            <div className="card" style={{background:'rgba(99,102,241,.08)',border:'1px solid rgba(99,102,241,.2)'}}>
-              <div style={{fontSize:'14px',fontWeight:'700',color:'#a5b4fc',marginBottom:'8px'}}>🔗 Como funciona o convite individual</div>
-              <p style={{fontSize:'13px',color:'#94a3b8',margin:0,lineHeight:'1.6'}}>
-                Ao clicar em <strong style={{color:'#f1f5f9'}}>✉️ Convidar Usuário</strong>, o Supabase envia um e-mail com um link único e exclusivo para aquele usuário.
+            <div className="card" style={{background:'rgba(99,102,241,.05)',border:'1px solid rgba(99,102,241,.2)'}}>
+              <div style={{fontSize:'14px',fontWeight:'700',color:'#4f46e5',marginBottom:'8px'}}>🔗 Como funciona o convite individual</div>
+              <p style={{fontSize:'13px',color:'#475569',margin:0,lineHeight:'1.6'}}>
+                Ao clicar em <strong style={{color:'#1e293b'}}>✉️ Convidar Usuário</strong>, o sistema envia automaticamente um e-mail com um link único e exclusivo para aquele usuário.
                 Ao clicar no link, ele define a própria senha e acessa o sistema com seu perfil personalizado.
                 Cada link é de uso único e expira em 24 horas por segurança.
               </p>
@@ -913,7 +915,7 @@ function ModalActions({ onCancel, onSave, saveLabel='💾 Salvar' }) {
 }
 
 function Empty({ icon, msg }) {
-  return <div style={{textAlign:'center',padding:'32px 20px',color:'#64748b'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{icon}</div><p style={{fontSize:'13px',margin:0}}>{msg}</p></div>
+  return <div style={{textAlign:'center',padding:'32px 20px',color:'#94a3b8'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{icon}</div><p style={{fontSize:'13px',margin:0}}>{msg}</p></div>
 }
 
 // ── CSS ─────────────────────────────────────────────────────

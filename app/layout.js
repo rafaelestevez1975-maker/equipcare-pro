@@ -39,7 +39,7 @@ export default function RootLayout({ children }) {
         <meta name="msapplication-TileColor" content="#1e293b" />
         <meta name="msapplication-TileImage" content="/icons/icon-144.png" />
       </head>
-      <body style={{ margin: 0, padding: 0, background: '#f1f5f9' }}>
+      <body style={{ margin: 0, padding: 0, background: '#f1f5f9', color: '#1e293b' }}>
         {children}
         <script dangerouslySetInnerHTML={{ __html: `
           if ('serviceWorker' in navigator) {
