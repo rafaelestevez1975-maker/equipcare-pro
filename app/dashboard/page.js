@@ -918,8 +918,9 @@ function Empty({ icon, msg }) {
   return <div style={{textAlign:'center',padding:'32px 20px',color:'#94a3b8'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{icon}</div><p style={{fontSize:'13px',margin:0}}>{msg}</p></div>
 }
 
-// ── CSS ─────────────────────────────────────────────────────
+// ── CSS v3 (white main, dark sidebar) ────────────────────────
 const CSS = `
+  html,body{background:#ffffff !important}
   *{box-sizing:border-box}
   ::-webkit-scrollbar{width:6px;height:6px}
   ::-webkit-scrollbar-track{background:#f8fafc}
@@ -942,7 +943,7 @@ const CSS = `
   .logout-btn{margin-left:auto;background:none;border:1px solid #334155;border-radius:8px;padding:5px 8px;cursor:pointer;color:#94a3b8;font-size:11px;transition:all .2s}
   .logout-btn:hover{background:#ef4444;color:#fff;border-color:#ef4444}
   /* ── HEADER (light) ── */
-  .app-header{position:fixed;top:0;left:260px;right:0;height:64px;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 24px;gap:16px;z-index:90;transition:left .3s;color:#1e293b}
+  .app-header{position:fixed;top:0;left:260px;right:0;height:64px;background:#ffffff !important;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;padding:0 24px;gap:16px;z-index:90;transition:left .3s;color:#1e293b !important}
   .app-header.full{left:0}
   .toggle-btn{background:none;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;cursor:pointer;color:#64748b;font-size:16px;transition:all .2s;flex-shrink:0}
   .toggle-btn:hover{background:#f1f5f9;color:#1e293b}
@@ -951,11 +952,12 @@ const CSS = `
   .notif-btn:hover{background:#f1f5f9}
   .notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:#ef4444;border-radius:50%;border:2px solid #fff}
   /* ── MAIN AREA (white) ── */
-  .app-main{margin-left:260px;margin-top:64px;padding:28px;transition:margin-left .3s;min-height:calc(100vh - 64px);background:#ffffff;color:#1e293b}
+  .app-main{margin-left:260px;margin-top:64px;padding:28px;transition:margin-left .3s;min-height:calc(100vh - 64px);background:#ffffff !important;color:#1e293b !important}
+  .app-main *{color:#1e293b}
   .app-main.full{margin-left:0}
   .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
-  .card{background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .card{background:#ffffff !important;border:1px solid #e2e8f0 !important;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
   .search-bar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
   .search-input{padding:9px 14px;border-radius:9px;background:#fff;border:1px solid #e2e8f0;color:#1e293b;font-size:13px;outline:none;flex:1;min-width:160px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
   .search-input:focus{border-color:#6366f1}
