@@ -33,6 +33,9 @@ export default function Dashboard() {
   const [expenses, setExpenses]   = useState([])
   const [auditLog, setAuditLog]   = useState([])
   const [profiles, setProfiles]   = useState([])
+  const [units, setUnits]         = useState([])
+  const [statuses, setStatuses]   = useState([])
+  const [eqTypes, setEqTypes]     = useState([])
 
   // Modal/form state
   const [modal, setModal] = useState(null)
@@ -40,6 +43,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({})
   const [maintTab, setMaintTab] = useState('prev')
+  const [adminTab, setAdminTab] = useState('users')
   const [calYear, setCalYear]   = useState(new Date().getFullYear())
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
   const [inviteLink, setInviteLink] = useState('')
@@ -59,10 +63,11 @@ export default function Dashboard() {
 
   async function loadAll(u) {
     setLoading(true)
-    const [eq, or, st, lo, ve, ex, au, pr] = await Promise.all([
+    const [eq, or, st, lo, ve, ex, au, pr, un, ss, et] = await Promise.all([
       db.equipment.getAll(), db.orders.getAll(), db.stops.getAll(),
       db.logistics.getAll(), db.vendors.getAll(), db.expenses.getAll(),
-      db.audit.getAll(), db.profiles.getAll()
+      db.audit.getAll(), db.profiles.getAll(),
+      db.units.getAll(), db.statuses.getAll(), db.equipment_types.getAll()
     ])
     setEquipment(eq.data || [])
     setOrders(or.data || [])
@@ -72,6 +77,9 @@ export default function Dashboard() {
     setExpenses(ex.data || [])
     setAuditLog(au.data || [])
     setProfiles(pr.data || [])
+    setUnits(un.data || [])
+    setStatuses(ss.data || [])
+    setEqTypes(et.data || [])
     // load own profile
     const { data: prof } = await getClient().from('profiles').select('*').eq('id', u.id).single()
     setProfile(prof)
@@ -272,7 +280,7 @@ export default function Dashboard() {
         </div>
 
         <div className="nav-section"><div className="nav-label">Administração</div>
-          {[['users','👥','Gestão de Usuários'],['audit','📋','Auditoria de Ações']].map(([id,icon,label])=>(
+          {[['admin','⚙️','Administração'],['audit','📋','Auditoria de Ações']].map(([id,icon,label])=>(
             <button key={id} className={`nav-item${page===id?' active':''}`} onClick={()=>setPage(id)}>
               <span className="nav-icon">{icon}</span> {label}
             </button>
@@ -620,41 +628,133 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ══ USUÁRIOS ══ */}
-        {page==='users' && (
+        {/* ══ ADMINISTRAÇÃO ══ */}
+        {page==='admin' && (
           <div>
-            <div className="search-bar">
-              <input className="search-input" placeholder="🔍 Buscar usuário..." value={search} onChange={e=>setSearch(e.target.value)}/>
-              <button className="btn btn-primary" onClick={()=>{setForm({inv_role:'Operador'});setModal('invite')}}>✉️ Convidar Usuário</button>
+            <div className="tabs">
+              {[['users','👥 Usuários'],['statuses','🔵 Status'],['types','🏷️ Tipos'],['units_tab','🏢 Unidades']].map(([id,label])=>(
+                <button key={id} className={`tab-btn${adminTab===id?' active':''}`} onClick={()=>setAdminTab(id)}>{label}</button>
+              ))}
             </div>
-            <div className="card" style={{padding:0}}>
-              <div className="table-wrap">
-                <table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Unidade</th><th>Status</th><th>Ações</th></tr></thead><tbody>
-                  {profiles.filter(p=>(p.name+p.role+p.unit).toLowerCase().includes(search.toLowerCase())).map(p=>(
-                    <tr key={p.id}>
-                      <td><strong>{p.name}</strong></td>
-                      <td className="muted">{p.id===user?.id ? user.email : '—'}</td>
-                      <td><span className={`badge badge-${p.role==='Administrador'?'danger':p.role==='Técnico'?'warning':'blue'}`}>{p.role}</span></td>
-                      <td className="muted">{p.unit||'—'}</td>
-                      <td><span className={`badge badge-${p.status==='Ativo'?'success':'danger'}`}>{p.status}</span></td>
-                      <td>
-                        <button className="btn btn-outline btn-sm" onClick={()=>{setForm({id:p.id,name:p.name,role:p.role,unit:p.unit,status:p.status});setModal('editProfile')}}>✏️</button>
-                        {p.id !== RAFAEL_ID && <button className="btn btn-danger btn-sm" style={{marginLeft:'4px'}} onClick={()=>deleteUser(p.id, p.name)}>🗑</button>}
-                      </td>
-                    </tr>
-                  ))}
-                  {!profiles.length && <tr><td colSpan="6" style={{textAlign:'center',padding:'32px',color:'#64748b'}}>Nenhum usuário cadastrado.</td></tr>}
-                </tbody></table>
+
+            {/* ── USUÁRIOS ── */}
+            {adminTab==='users' && <>
+              <div className="search-bar">
+                <input className="search-input" placeholder="🔍 Buscar usuário..." value={search} onChange={e=>setSearch(e.target.value)}/>
+                <button className="btn btn-primary" onClick={()=>{setForm({inv_role:'Operador'});setModal('invite')}}>✉️ Convidar Usuário</button>
               </div>
-            </div>
-            <div className="card" style={{background:'rgba(99,102,241,.05)',border:'1px solid rgba(99,102,241,.2)'}}>
-              <div style={{fontSize:'14px',fontWeight:'700',color:'#4f46e5',marginBottom:'8px'}}>🔗 Como funciona o convite individual</div>
-              <p style={{fontSize:'13px',color:'#475569',margin:0,lineHeight:'1.6'}}>
-                Ao clicar em <strong style={{color:'#1e293b'}}>✉️ Convidar Usuário</strong>, o sistema envia automaticamente um e-mail com um link único e exclusivo para aquele usuário.
-                Ao clicar no link, ele define a própria senha e acessa o sistema com seu perfil personalizado.
-                Cada link é de uso único e expira em 24 horas por segurança.
-              </p>
-            </div>
+              <div className="card" style={{padding:0}}>
+                <div className="table-wrap">
+                  <table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Unidade</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+                    {profiles.filter(p=>(p.name+p.role+p.unit).toLowerCase().includes(search.toLowerCase())).map(p=>(
+                      <tr key={p.id}>
+                        <td><strong>{p.name}</strong></td>
+                        <td className="muted">{p.id===user?.id ? user.email : '—'}</td>
+                        <td><span className={`badge badge-${p.role==='Administrador'?'danger':p.role==='Técnico'?'warning':'blue'}`}>{p.role}</span></td>
+                        <td className="muted">{p.unit||'—'}</td>
+                        <td><span className={`badge badge-${p.status==='Ativo'?'success':'danger'}`}>{p.status}</span></td>
+                        <td>
+                          <button className="btn btn-outline btn-sm" onClick={()=>{setForm({id:p.id,name:p.name,role:p.role,unit:p.unit,status:p.status});setModal('editProfile')}}>✏️</button>
+                          {p.id !== RAFAEL_ID && <button className="btn btn-danger btn-sm" style={{marginLeft:'4px'}} onClick={()=>deleteUser(p.id, p.name)}>🗑</button>}
+                        </td>
+                      </tr>
+                    ))}
+                    {!profiles.length && <tr><td colSpan="6" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhum usuário cadastrado.</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+            </>}
+
+            {/* ── STATUS ── */}
+            {adminTab==='statuses' && <>
+              <div className="search-bar">
+                <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Gerencie os status disponíveis para os equipamentos.</span>
+                <button className="btn btn-primary" onClick={()=>{setForm({});setModal('newStatus')}}>➕ Novo Status</button>
+              </div>
+              <div className="card" style={{padding:0}}>
+                <div className="table-wrap">
+                  <table><thead><tr><th>Status</th><th>Cor</th><th>Equipamentos</th><th>Ações</th></tr></thead><tbody>
+                    {statuses.map(s=>(
+                      <tr key={s.id}>
+                        <td><strong style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                          <span style={{width:'10px',height:'10px',borderRadius:'50%',background:s.color,display:'inline-block',flexShrink:0}}/>
+                          {s.name}
+                        </strong></td>
+                        <td className="muted">{s.color}</td>
+                        <td><span className="badge badge-gray">{equipment.filter(e=>e.status===s.name).length} equip.</span></td>
+                        <td>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{
+                            if(!confirm(`Excluir status "${s.name}"?`)) return
+                            await db.statuses.delete(s.id); reload(); showToast('Status excluído.')
+                          }}>🗑</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!statuses.length && <tr><td colSpan="4" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhum status cadastrado.</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+            </>}
+
+            {/* ── TIPOS ── */}
+            {adminTab==='types' && <>
+              <div className="search-bar">
+                <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Gerencie os tipos de equipamento disponíveis.</span>
+                <button className="btn btn-primary" onClick={()=>{setForm({});setModal('newType')}}>➕ Novo Tipo</button>
+              </div>
+              <div className="card" style={{padding:0}}>
+                <div className="table-wrap">
+                  <table><thead><tr><th>Tipo</th><th>Equipamentos</th><th>Ações</th></tr></thead><tbody>
+                    {eqTypes.map(t=>(
+                      <tr key={t.id}>
+                        <td><strong>{t.name}</strong></td>
+                        <td><span className="badge badge-blue">{equipment.filter(e=>e.type===t.name).length} equip.</span></td>
+                        <td>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{
+                            if(!confirm(`Excluir tipo "${t.name}"?`)) return
+                            await db.equipment_types.delete(t.id); reload(); showToast('Tipo excluído.')
+                          }}>🗑</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!eqTypes.length && <tr><td colSpan="3" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhum tipo cadastrado.</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+            </>}
+
+            {/* ── UNIDADES ── */}
+            {adminTab==='units_tab' && <>
+              <div className="search-bar">
+                <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Unidades da rede — gerencie as filiais e locais.</span>
+                <button className="btn btn-primary" onClick={()=>{setForm({});setModal('newUnit')}}>➕ Nova Unidade</button>
+              </div>
+              <div className="card" style={{padding:0}}>
+                <div className="table-wrap">
+                  <table><thead><tr><th>Unidade</th><th>Equipamentos</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+                    {units.map(u=>(
+                      <tr key={u.id}>
+                        <td><strong>{u.name}</strong></td>
+                        <td><span className="badge badge-blue">{equipment.filter(e=>e.unit===u.name).length} equip.</span></td>
+                        <td>
+                          <button onClick={async()=>{await db.units.update(u.id,{active:!u.active});reload()}}
+                            className={`badge badge-${u.active?'success':'danger'}`} style={{cursor:'pointer',border:'none',fontSize:'12px'}}>
+                            {u.active?'✅ Ativa':'❌ Inativa'}
+                          </button>
+                        </td>
+                        <td>
+                          <button className="btn btn-danger btn-sm" onClick={async()=>{
+                            if(!confirm(`Excluir unidade "${u.name}"?`)) return
+                            await db.units.delete(u.id); reload(); showToast('Unidade excluída.')
+                          }}>🗑</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!units.length && <tr><td colSpan="4" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma unidade cadastrada.</td></tr>}
+                  </tbody></table>
+                </div>
+              </div>
+            </>}
           </div>
         )}
 
@@ -694,19 +794,22 @@ export default function Dashboard() {
               </div>
               <div className="form-row">
                 <FG label="Nº de Série"><input className="fi" value={form.serial||''} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Ex: QNT-001-2024"/></FG>
-                <FG label="Tipo"><select className="fi" value={form.type||'Laser'} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
-                  {['Laser','Ultrassom','Estética','Diagnóstico','Outro'].map(t=><option key={t}>{t}</option>)}
+                <FG label="Tipo"><select className="fi" value={form.type||''} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
+                  <option value="">— Selecione —</option>
+                  {eqTypes.map(t=><option key={t.id}>{t.name}</option>)}
                 </select></FG>
               </div>
               <div className="form-row">
-                <FG label="Localização"><input className="fi" value={form.location||''} onChange={e=>setForm(f=>({...f,location:e.target.value}))} placeholder="Ex: Clínica Centro"/></FG>
-                <FG label="Disponibilidade"><select className="fi" value={form.availability||'Estoque'} onChange={e=>setForm(f=>({...f,availability:e.target.value}))}>
-                  {['Estoque','Em Uso','Emprestado','Em Reparo'].map(a=><option key={a}>{a}</option>)}
+                <FG label="Unidade"><select className="fi" value={form.unit||''} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}>
+                  <option value="">— Selecione a unidade —</option>
+                  {units.map(u=><option key={u.id} value={u.name}>{u.name}{!u.active?' (Inativa)':''}</option>)}
                 </select></FG>
+                <FG label="Localização (detalhe)"><input className="fi" value={form.location||''} onChange={e=>setForm(f=>({...f,location:e.target.value}))} placeholder="Ex: Sala 2"/></FG>
               </div>
               <div className="form-row">
-                <FG label="Status"><select className="fi" value={form.status||'Operando'} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
-                  {['Operando','Manutenção','Inativo','Estoque'].map(s=><option key={s}>{s}</option>)}
+                <FG label="Status"><select className="fi" value={form.status||''} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+                  <option value="">— Selecione —</option>
+                  {statuses.map(s=><option key={s.id}>{s.name}</option>)}
                 </select></FG>
                 <FG label="Data de Aquisição"><input className="fi" type="date" value={form.acquisition_date||''} onChange={e=>setForm(f=>({...f,acquisition_date:e.target.value}))}/></FG>
               </div>
@@ -848,6 +951,48 @@ export default function Dashboard() {
               <ModalActions onCancel={()=>setModal(null)} onSave={async()=>{
                 await db.profiles.update(form.id,{name:form.name,role:form.role,unit:form.unit,status:form.status})
                 setModal(null); reload(); showToast('Perfil atualizado!')
+              }}/>
+            </>}
+
+            {modal==='newStatus' && <>
+              <h2>🔵 Novo Status</h2>
+              <FG label="Nome do Status"><input className="fi" placeholder="Ex: Operando 100%" value={form.name||''} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></FG>
+              <FG label="Cor (hex)">
+                <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                  <input type="color" value={form.color||'#10b981'} onChange={e=>setForm(f=>({...f,color:e.target.value}))} style={{width:'48px',height:'36px',border:'1px solid #e2e8f0',borderRadius:'6px',cursor:'pointer'}}/>
+                  <input className="fi" placeholder="#10b981" value={form.color||'#10b981'} onChange={e=>setForm(f=>({...f,color:e.target.value}))} style={{flex:1}}/>
+                </div>
+              </FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={async()=>{
+                if(!form.name?.trim()){showToast('Digite o nome do status.',true);return}
+                await db.statuses.insert({name:form.name.trim(),color:form.color||'#10b981'})
+                setModal(null); reload(); showToast('Status criado!')
+              }}/>
+            </>}
+
+            {modal==='newType' && <>
+              <h2>🏷️ Novo Tipo de Equipamento</h2>
+              <FG label="Nome do Tipo"><input className="fi" placeholder="Ex: Laser Quanta" value={form.name||''} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={async()=>{
+                if(!form.name?.trim()){showToast('Digite o nome do tipo.',true);return}
+                await db.equipment_types.insert({name:form.name.trim()})
+                setModal(null); reload(); showToast('Tipo criado!')
+              }}/>
+            </>}
+
+            {modal==='newUnit' && <>
+              <h2>🏢 Nova Unidade</h2>
+              <FG label="Nome da Unidade"><input className="fi" placeholder="Ex: Matriz São Paulo" value={form.name||''} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></FG>
+              <FG label="Status inicial">
+                <select className="fi" value={form.active===false?'false':'true'} onChange={e=>setForm(f=>({...f,active:e.target.value==='true'}))}>
+                  <option value="true">✅ Ativa</option>
+                  <option value="false">❌ Inativa</option>
+                </select>
+              </FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={async()=>{
+                if(!form.name?.trim()){showToast('Digite o nome da unidade.',true);return}
+                await db.units.insert({name:form.name.trim(),active:form.active!==false})
+                setModal(null); reload(); showToast('Unidade criada!')
               }}/>
             </>}
 
