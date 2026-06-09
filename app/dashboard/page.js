@@ -137,14 +137,15 @@ export default function Dashboard() {
       status: form.status || 'Aberta', description: form.description || '', created_by: user.id
     }
     if (!data.tech) { showToast('Informe o técnico responsável.',true); return }
+    let error
     if (form.id) {
-      await db.orders.update(form.id, data)
-      showToast('OS atualizada!')
+      const res = await db.orders.update(form.id, data); error = res.error
+      if (!error) showToast('OS atualizada!')
     } else {
-      await db.orders.insert(data)
-      await addAudit('Criou OS','Manutenções',data.type)
-      showToast('OS criada!')
+      const res = await db.orders.insert(data); error = res.error
+      if (!error) { await addAudit('Criou OS','Manutenções',data.type); showToast('OS criada!') }
     }
+    if (error) { showToast('Erro ao salvar OS: ' + error.message, true); return }
     setModal(null); reload()
   }
 
@@ -166,10 +167,23 @@ export default function Dashboard() {
   }
 
   async function saveVendor() {
-    const data = { company: form.company, contact: form.contact, phone: form.phone, email: form.email, specialty: form.specialty, rating: form.rating||'5 ⭐', notes: form.notes }
+    const data = {
+      company: form.company, name: form.company,
+      contact: form.contact, contact_name: form.contact,
+      phone: form.phone, email: form.email,
+      specialty: form.specialty, service_type: form.specialty,
+      rating: form.rating||'5 ⭐', notes: form.notes||''
+    }
     if (!data.company) { showToast('Informe o nome da empresa.',true); return }
-    if (form.id) { await db.vendors.update(form.id, data); showToast('Fornecedor atualizado!') }
-    else { await db.vendors.insert(data); await addAudit('Adicionou','Fornecedores',data.company); showToast('Fornecedor adicionado!') }
+    let error
+    if (form.id) {
+      const res = await db.vendors.update(form.id, data); error = res.error
+      if (!error) showToast('Fornecedor atualizado!')
+    } else {
+      const res = await db.vendors.insert(data); error = res.error
+      if (!error) { await addAudit('Adicionou','Fornecedores',data.company); showToast('Fornecedor adicionado!') }
+    }
+    if (error) { showToast('Erro ao salvar: ' + error.message, true); return }
     setModal(null); reload()
   }
 
