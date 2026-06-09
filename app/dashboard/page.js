@@ -136,6 +136,7 @@ export default function Dashboard() {
       open_date: form.open_date || today(), cost: parseFloat(form.cost)||0,
       status: form.status || 'Aberta', description: form.description || '', created_by: user.id
     }
+    if (!data.equip_id) { showToast('Selecione o equipamento.',true); return }
     if (!data.tech) { showToast('Informe o técnico responsável.',true); return }
     let error
     if (form.id) {
@@ -232,6 +233,7 @@ export default function Dashboard() {
   }).reduce((s,e)=>s+(parseFloat(e.value)||0),0)
 
   const eqMap = Object.fromEntries(equipment.map(e=>[e.id, `${e.brand} ${e.model}`]))
+  const eqFull = Object.fromEntries(equipment.map(e=>[e.id, e])) // mapa completo por id
 
   // Calendar
   const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
@@ -455,16 +457,19 @@ export default function Dashboard() {
               <Card title="📡 Status Preventivo" sub="Agenda de manutenções preventivas"
                 action={<button className="btn btn-warning btn-sm" onClick={()=>{setForm({equip_id:equipment[0]?.id||'',start_date:today(),end_date:today()});setModal('stop')}}>📅 Agendar Parada</button>}>
                 <div className="table-wrap">
-                  <table><thead><tr><th>Equipamento</th><th>Status</th><th>Próxima Manutenção</th><th>Alerta</th></tr></thead><tbody>
+                  <table><thead><tr><th>Equipamento</th><th>Nº Série</th><th>Unidade</th><th>OS Realizadas</th><th>Status Preventivo</th><th>Próxima Manutenção</th></tr></thead><tbody>
                     {equipment.map(e=>{
-                      const last = orders.filter(o=>o.equip_id===e.id && o.type==='Preventiva').slice(-1)[0]
+                      const osEquip = orders.filter(o=>o.equip_id===e.id)
+                      const last = osEquip.filter(o=>o.type==='Preventiva').slice(-1)[0]
                       const next = last ? (() => { const d = new Date(last.open_date+'T00:00:00'); d.setMonth(d.getMonth()+6); return d })() : null
                       const late = next && next < new Date()
                       return <tr key={e.id}>
-                        <td><strong>{e.brand} {e.model}</strong><br/><span style={{fontSize:'11px',color:'#64748b'}}>{e.serial}</span></td>
+                        <td><strong>{e.brand} {e.model}</strong></td>
+                        <td className="muted" style={{fontSize:'12px'}}>{e.serial}</td>
+                        <td><span className="badge badge-blue">{e.unit||'—'}</span></td>
+                        <td><span className="badge badge-gray">{osEquip.length} OS</span></td>
                         <td><span className={`badge badge-${late?'danger':'success'}`}>{late?'⚠ Vencida':'✅ Em Dia'}</span></td>
                         <td className="muted">{next ? next.toLocaleDateString('pt-BR') : '—'}</td>
-                        <td><span className={`badge badge-${late?'warning':'gray'}`}>Normal</span></td>
                       </tr>
                     })}
                     {!equipment.length && <tr><td colSpan="4" style={{textAlign:'center',padding:'24px',color:'#64748b'}}>Nenhum equipamento.</td></tr>}
@@ -484,16 +489,22 @@ export default function Dashboard() {
                 </div>
                 <div className="card" style={{padding:0}}>
                   <div className="table-wrap">
-                    <table><thead><tr><th>#OS</th><th>Equipamento</th><th>Tipo</th><th>Técnico</th><th>Data</th><th>Custo</th><th>Status</th><th>Ações</th></tr></thead><tbody>
+                    <table><thead><tr><th>#OS</th><th>Equipamento</th><th>Nº Série</th><th>Unidade</th><th>Tipo</th><th>Técnico</th><th>Data</th><th>Custo</th><th>Status</th><th>Ações</th></tr></thead><tbody>
                       {orders.filter(o=>{
                         const eq = eqMap[o.equip_id]||''
+                        const unit = eqFull[o.equip_id]?.unit||''
+                        const serial = eqFull[o.equip_id]?.serial||''
                         const q = search.toLowerCase()
-                        return (eq+o.tech+o.description).toLowerCase().includes(q) && (!filters.osStatus || o.status===filters.osStatus)
-                      }).map((o,i)=>(
+                        return (eq+o.tech+o.description+unit+serial).toLowerCase().includes(q) && (!filters.osStatus || o.status===filters.osStatus)
+                      }).map((o,i)=>{
+                        const eq = eqFull[o.equip_id]
+                        return (
                         <tr key={o.id}>
                           <td className="muted">#{String(i+1).padStart(3,'0')}</td>
                           <td><strong>{eqMap[o.equip_id]||'—'}</strong></td>
-                          <td><span className="badge badge-blue">{o.type}</span></td>
+                          <td className="muted" style={{fontSize:'12px'}}>{eq?.serial||'—'}</td>
+                          <td><span className="badge badge-blue">{eq?.unit||'—'}</span></td>
+                          <td><span className="badge badge-gray">{o.type}</span></td>
                           <td className="muted">{o.tech}</td>
                           <td className="muted">{fmtDate(o.open_date)}</td>
                           <td style={{color:'#f59e0b',fontWeight:'700'}}>{fmt(o.cost)}</td>
@@ -503,8 +514,8 @@ export default function Dashboard() {
                             <button className="btn btn-danger btn-sm" style={{marginLeft:'4px'}} onClick={()=>deleteOrder(o.id)}>🗑</button>
                           </td>
                         </tr>
-                      ))}
-                      {!orders.length && <tr><td colSpan="8" style={{textAlign:'center',padding:'32px',color:'#64748b'}}>Nenhuma OS registrada.</td></tr>}
+                      )})}
+                      {!orders.length && <tr><td colSpan="10" style={{textAlign:'center',padding:'32px',color:'#64748b'}}>Nenhuma OS registrada.</td></tr>}
                     </tbody></table>
                   </div>
                 </div>
@@ -834,10 +845,18 @@ export default function Dashboard() {
             {/* Ordem de Serviço */}
             {modal==='order' && <>
               <h2>{form.id ? '✏️ Editar OS' : '🔧 Nova Ordem de Serviço'}</h2>
+              {!equipment.length && (
+                <div style={{background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',borderRadius:'10px',padding:'14px',marginBottom:'16px',fontSize:'13px',color:'#fca5a5'}}>
+                  ⚠️ <strong>Nenhum equipamento cadastrado.</strong> Cadastre o equipamento primeiro em <strong>Inventário → ➕ Novo Equipamento</strong> para criar uma OS e registrar o histórico de reparos.
+                </div>
+              )}
               <div className="form-row">
-                <FG label="Equipamento"><select className="fi" value={form.equip_id||''} onChange={e=>setForm(f=>({...f,equip_id:e.target.value}))}>
-                  {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model} ({e.serial})</option>)}
-                </select></FG>
+                <FG label="Equipamento (obrigatório cadastrar para histórico)">
+                  <select className="fi" value={form.equip_id||''} onChange={e=>setForm(f=>({...f,equip_id:e.target.value}))}>
+                    <option value="">— Selecione o equipamento —</option>
+                    {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model} · Série: {e.serial} · Unidade: {e.unit||'—'}</option>)}
+                  </select>
+                </FG>
                 <FG label="Tipo"><select className="fi" value={form.type||'Preventiva'} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>
                   {['Preventiva','Corretiva','Calibração','Revisão Geral'].map(t=><option key={t}>{t}</option>)}
                 </select></FG>
