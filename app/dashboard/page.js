@@ -132,11 +132,11 @@ export default function Dashboard() {
 
   async function saveOrder() {
     const data = {
-      equip_id: form.equip_id, type: form.type, tech: form.tech,
+      equip_id: form.equip_id || null, type: form.type || 'Preventiva', tech: form.tech,
       open_date: form.open_date || today(), cost: parseFloat(form.cost)||0,
-      status: form.status, description: form.description, created_by: user.id
+      status: form.status || 'Aberta', description: form.description || '', created_by: user.id
     }
-    if (!data.tech) { showToast('Informe o técnico.',true); return }
+    if (!data.tech) { showToast('Informe o técnico responsável.',true); return }
     if (form.id) {
       await db.orders.update(form.id, data)
       showToast('OS atualizada!')
