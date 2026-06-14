@@ -1,36 +1,81 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Fundo arredondado -->
-  <rect width="512" height="512" rx="110" fill="#1e293b"/>
-  <!-- Gradiente de fundo interno -->
-  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="60%" stop-color="#1e1b4b"/>
       <stop offset="100%" stop-color="#0f172a"/>
     </linearGradient>
-    <linearGradient id="gear" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#818cf8"/>
+    <linearGradient id="gearGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5b4fc"/>
       <stop offset="100%" stop-color="#6366f1"/>
     </linearGradient>
-    <linearGradient id="laser" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#38bdf8"/>
+    <linearGradient id="laserGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#7dd3fc"/>
       <stop offset="100%" stop-color="#0ea5e9"/>
     </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <!-- Engrenagem grande -->
-  <g transform="translate(256,230)">
-    <path d="M0-90 L15-75 L40-85 L50-65 L35-50 L38-28 L55-20 L55,0 L38,20 L35,42 L50,57 L40,77 L15,67 L0,82 L-15,67 L-40,77 L-50,57 L-35,42 L-38,20 L-55,0 L-55,-20 L-38,-28 L-35,-50 L-50,-65 L-40,-85 L-15,-75 Z" 
-          fill="url(#gear)" opacity="0.9"/>
-    <circle r="35" fill="#0f172a"/>
-    <circle r="22" fill="url(#gear)"/>
-    <!-- Raio laser -->
-    <line x1="-22" y1="0" x2="-90" y2="-40" stroke="url(#laser)" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
-    <circle cx="-90" cy="-40" r="10" fill="#38bdf8" opacity="0.7"/>
-    <!-- Ponto brilhante -->
-    <circle cx="-90" cy="-40" r="5" fill="#e0f2fe"/>
+
+  <!-- Fundo arredondado estilo app -->
+  <rect width="512" height="512" rx="115" fill="url(#bg)"/>
+
+  <!-- Brilho sutil no topo -->
+  <ellipse cx="256" cy="80" rx="180" ry="60" fill="white" opacity="0.04"/>
+
+  <!-- Engrenagem principal -->
+  <g transform="translate(256,210)" filter="url(#glow)">
+    <!-- Dentes da engrenagem -->
+    <path d="
+      M0,-108 L14,-92 L36,-100 L48,-80 L34,-66
+      L38,-44 L58,-36 L60,-12 L42,-4 L44,20
+      L60,32 L52,56 L28,52 L16,72 L-4,70
+      L-16,88 L-40,80 L-44,58 L-64,52 L-72,28
+      L-56,16 L-56,-8 L-72,-24 L-64,-48
+      L-44,-56 L-40,-78 L-16,-90 L-4,-108 Z
+    " fill="url(#gearGrad)" opacity="0.95"/>
+    <!-- Centro da engrenagem -->
+    <circle r="38" fill="#0f172a"/>
+    <circle r="26" fill="url(#gearGrad)" opacity="0.9"/>
+    <circle r="10" fill="#0f172a"/>
   </g>
-  <!-- Texto EC -->
-  <text x="256" y="395" font-family="system-ui,sans-serif" font-size="72" font-weight="900" fill="#a5b4fc" text-anchor="middle" letter-spacing="2">EC</text>
-  <!-- Linha decorativa -->
-  <rect x="156" y="410" width="200" height="4" rx="2" fill="url(#laser)" opacity="0.6"/>
+
+  <!-- Raio laser saindo da engrenagem -->
+  <g filter="url(#softglow)">
+    <line x1="198" y1="178" x2="108" y2="128" stroke="url(#laserGrad)" stroke-width="7" stroke-linecap="round" opacity="0.85"/>
+    <!-- Ponto de impacto laser -->
+    <circle cx="108" cy="128" r="14" fill="#0ea5e9" opacity="0.35"/>
+    <circle cx="108" cy="128" r="8" fill="#7dd3fc" opacity="0.7"/>
+    <circle cx="108" cy="128" r="4" fill="white" opacity="0.95"/>
+  </g>
+
+  <!-- Segunda linha laser menor -->
+  <line x1="286" y1="162" x2="356" y2="122" stroke="url(#laserGrad)" stroke-width="4" stroke-linecap="round" opacity="0.4"/>
+  <circle cx="356" cy="122" r="5" fill="#7dd3fc" opacity="0.5"/>
+
+  <!-- Texto "EC" -->
+  <text x="256" y="388"
+    font-family="system-ui,-apple-system,sans-serif"
+    font-size="80" font-weight="900"
+    fill="url(#gearGrad)"
+    text-anchor="middle"
+    letter-spacing="6">EC</text>
+
+  <!-- Subtexto "PRO" menor -->
+  <text x="256" y="418"
+    font-family="system-ui,-apple-system,sans-serif"
+    font-size="28" font-weight="700"
+    fill="#38bdf8"
+    text-anchor="middle"
+    letter-spacing="10"
+    opacity="0.85">PRO</text>
+
+  <!-- Linha decorativa abaixo do texto -->
+  <rect x="176" y="432" width="160" height="3" rx="2" fill="url(#laserGrad)" opacity="0.6"/>
 </svg>
