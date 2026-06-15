@@ -162,9 +162,21 @@ export default function Dashboard() {
   }
 
   async function saveLogistic() {
-    await db.logistics.insert({ event_date: form.event_date, log_type: form.log_type, equip_id: form.equip_id||null, description: form.description })
-    await addAudit('Adicionou Evento','Logística',form.log_type)
-    setModal(null); showToast('Evento adicionado!'); reload()
+    const data = {
+      event_date: form.event_date, log_type: form.log_type,
+      equip_id: form.equip_id||null, description: form.description||'',
+      store: form.store||'', serial: form.serial||''
+    }
+    let error
+    if (form.id) {
+      const res = await db.logistics.update(form.id, data); error = res.error
+      if (!error) showToast('Evento atualizado!')
+    } else {
+      const res = await db.logistics.insert(data); error = res.error
+      if (!error) { await addAudit('Adicionou Evento','Logística',form.log_type); showToast('Evento adicionado!') }
+    }
+    if (error) { showToast('Erro: ' + error.message, true); return }
+    setModal(null); reload()
   }
 
   async function saveVendor() {
@@ -250,8 +262,20 @@ export default function Dashboard() {
     return days
   }
 
-  function calEventColor(type) {
-    return {Entrega:'#10b981',Retirada:'#f59e0b',Manutenção:'#6366f1',Instalação:'#0ea5e9',Treinamento:'#8b5cf6'}[type]||'#6366f1'
+  // Cores por nº de série conforme planilha Excel
+  const SERIAL_COLORS = {
+    'UQIA24043': '#eab308', // UC Amarelo
+    'UQIA24046': '#ef4444', // UC Vermelho
+    'UQIA24044': '#22c55e', // UC Verde
+    '1572219':   '#4c1d95', // AlexOne Roxo escuro
+    '1899819':   '#c2410c', // AlexOne Laranja escuro
+  }
+  function serialColor(serial) { return serial ? (SERIAL_COLORS[serial] || '#6366f1') : '#6366f1' }
+  function calEventColor(ev) {
+    if (ev && ev.serial && SERIAL_COLORS[ev.serial]) return SERIAL_COLORS[ev.serial]
+    if (ev && ev.equip_id && eqFull[ev.equip_id]?.serial) return serialColor(eqFull[ev.equip_id].serial)
+    const byType = {Entrega:'#10b981',Retirada:'#f59e0b',Manutenção:'#6366f1',Instalação:'#0ea5e9',Treinamento:'#8b5cf6'}
+    return byType[ev?.log_type||ev] || '#6366f1'
   }
 
   const RAFAEL_ID = '5a4b91a1-8cb1-45fe-b4dc-b0da4dd0fe48'
@@ -565,25 +589,34 @@ export default function Dashboard() {
                   const isToday = day.cur && day.d===now.getDate() && calMonth===now.getMonth() && calYear===now.getFullYear()
                   return <div key={i} style={{minHeight:'80px',background:isToday?'rgba(99,102,241,.08)':'#ffffff',border:`1px solid ${isToday?'#6366f1':'#e2e8f0'}`,borderRadius:'8px',padding:'6px',opacity:day.cur?1:.4}}>
                     <div style={{fontSize:'12px',fontWeight:'600',color:isToday?'#6366f1':'#64748b'}}>{day.d}</div>
-                    {evs.slice(0,2).map(e=><div key={e.id} style={{fontSize:'10px',padding:'2px 4px',borderRadius:'4px',marginTop:'2px',background:calEventColor(e.log_type)+'22',color:calEventColor(e.log_type)}}>{e.log_type}</div>)}
+                    {evs.slice(0,3).map(e=>{const c=calEventColor(e);return <div key={e.id} title={`${eqMap[e.equip_id]||e.log_type}${e.serial?' · '+e.serial:''}${e.store?' → '+e.store:''}`} style={{fontSize:'10px',padding:'2px 5px',borderRadius:'4px',marginTop:'2px',background:c+'28',color:c,fontWeight:'600',borderLeft:`3px solid ${c}`,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{eqMap[e.equip_id]||e.log_type}</div>})}
+                    {evs.length>3 && <div style={{fontSize:'9px',color:'#94a3b8',marginTop:'2px'}}>+{evs.length-3} mais</div>}
                   </div>
                 })}
               </div>
             </div>
             <Card title="📋 Eventos do Mês">
               <div className="table-wrap">
-                <table><thead><tr><th>Data</th><th>Descrição</th><th>Equipamento</th><th>Tipo</th><th>Ações</th></tr></thead><tbody>
-                  {logistics.filter(e=>{const d=new Date((e.event_date||'')+'T00:00:00');return d.getMonth()===calMonth&&d.getFullYear()===calYear}).map(e=>(
+                <table><thead><tr><th>Data</th><th>Equipamento</th><th>Nº Série</th><th>Loja</th><th>Tipo</th><th>Descrição</th><th>Ações</th></tr></thead><tbody>
+                  {logistics.filter(e=>{const d=new Date((e.event_date||'')+'T00:00:00');return d.getMonth()===calMonth&&d.getFullYear()===calYear}).map(e=>{
+                    const serial = e.serial || eqFull[e.equip_id]?.serial || ''
+                    const c = calEventColor(e)
+                    return (
                     <tr key={e.id}>
                       <td className="muted">{fmtDate(e.event_date)}</td>
-                      <td>{e.description}</td>
-                      <td className="muted">{eqMap[e.equip_id]||'—'}</td>
+                      <td><strong>{eqMap[e.equip_id]||'—'}</strong></td>
+                      <td><span style={{fontSize:'12px',fontWeight:'700',color:c,background:c+'18',padding:'2px 8px',borderRadius:'6px',borderLeft:`3px solid ${c}`}}>{serial||'—'}</span></td>
+                      <td className="muted">{e.store||'—'}</td>
                       <td><span className="badge badge-blue">{e.log_type}</span></td>
-                      <td><button className="btn btn-danger btn-sm" onClick={async()=>{await db.logistics.delete(e.id);reload();showToast('Evento removido.')}}>🗑</button></td>
+                      <td className="muted">{e.description}</td>
+                      <td style={{display:'flex',gap:'4px'}}>
+                        <button className="btn btn-outline btn-sm" onClick={()=>{setForm({id:e.id,event_date:e.event_date,log_type:e.log_type,equip_id:e.equip_id||'',description:e.description,store:e.store||'',serial:e.serial||serial});setModal('logistic')}}>✏️</button>
+                        <button className="btn btn-danger btn-sm" onClick={async()=>{if(!confirm('Remover evento?'))return;await db.logistics.delete(e.id);reload();showToast('Evento removido.')}}>🗑</button>
+                      </td>
                     </tr>
-                  ))}
+                  )})}
                   {!logistics.filter(e=>{const d=new Date((e.event_date||'')+'T00:00:00');return d.getMonth()===calMonth&&d.getFullYear()===calYear}).length &&
-                    <tr><td colSpan="5" style={{textAlign:'center',padding:'24px',color:'#64748b'}}>Nenhum evento este mês.</td></tr>}
+                    <tr><td colSpan="7" style={{textAlign:'center',padding:'24px',color:'#64748b'}}>Nenhum evento este mês.</td></tr>}
                 </tbody></table>
               </div>
             </Card>
@@ -890,21 +923,39 @@ export default function Dashboard() {
             </>}
 
             {/* Logística */}
-            {modal==='logistic' && <>
-              <h2>📅 Novo Evento de Logística</h2>
+            {modal==='logistic' && (()=>{
+              const selSerial = form.serial || eqFull[form.equip_id]?.serial || ''
+              const cor = selSerial ? (SERIAL_COLORS[selSerial]||'#6366f1') : '#6366f1'
+              return <>
+              <h2>{form.id ? '✏️ Editar Evento' : '📅 Novo Evento de Transporte'}</h2>
+              {selSerial && <div style={{background:cor+'18',border:`1px solid ${cor}44`,borderRadius:'8px',padding:'8px 14px',marginBottom:'14px',fontSize:'13px',fontWeight:'700',color:cor}}>● Série: {selSerial}</div>}
               <div className="form-row">
                 <FG label="Data"><input className="fi" type="date" value={form.event_date||''} onChange={e=>setForm(f=>({...f,event_date:e.target.value}))}/></FG>
                 <FG label="Tipo"><select className="fi" value={form.log_type||'Entrega'} onChange={e=>setForm(f=>({...f,log_type:e.target.value}))}>
                   {['Entrega','Retirada','Manutenção','Instalação','Treinamento'].map(t=><option key={t}>{t}</option>)}
                 </select></FG>
               </div>
-              <FG label="Equipamento"><select className="fi" value={form.equip_id||''} onChange={e=>setForm(f=>({...f,equip_id:e.target.value}))}>
-                <option value="">— Nenhum —</option>
-                {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model}</option>)}
-              </select></FG>
-              <FG label="Descrição"><textarea className="fi" rows="3" value={form.description||''} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Detalhes do evento..."/></FG>
+              <div className="form-row">
+                <FG label="Equipamento">
+                  <select className="fi" value={form.equip_id||''} onChange={e=>{
+                    const eq=eqFull[e.target.value]
+                    setForm(f=>({...f,equip_id:e.target.value,serial:eq?.serial||f.serial}))
+                  }}>
+                    <option value="">— Nenhum —</option>
+                    {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model} · {e.serial}</option>)}
+                  </select>
+                </FG>
+                <FG label="Nº de Série"><input className="fi" value={form.serial||''} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Ex: UQIA24043"/></FG>
+              </div>
+              <FG label="Loja de Destino / Origem">
+                <select className="fi" value={form.store||''} onChange={e=>setForm(f=>({...f,store:e.target.value}))}>
+                  <option value="">— Selecione a loja —</option>
+                  {['Butantã','Campo Limpo','Frei Caneca','Loja Conceito','Metro Tatuapé','Metro Tucuruvi','West Plaza','Moema','Osasco','Treinamento'].map(l=><option key={l}>{l}</option>)}
+                </select>
+              </FG>
+              <FG label="Descrição"><textarea className="fi" rows="2" value={form.description||''} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Detalhes do evento..."/></FG>
               <ModalActions onCancel={()=>setModal(null)} onSave={saveLogistic}/>
-            </>}
+            </>})()
 
             {/* Fornecedor */}
             {modal==='vendor' && <>
