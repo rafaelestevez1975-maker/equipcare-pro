@@ -923,39 +923,11 @@ export default function Dashboard() {
             </>}
 
             {/* Logística */}
-            {modal==='logistic' && (()=>{
-              const selSerial = form.serial || eqFull[form.equip_id]?.serial || ''
-              const cor = selSerial ? (SERIAL_COLORS[selSerial]||'#6366f1') : '#6366f1'
-              return <>
-              <h2>{form.id ? '✏️ Editar Evento' : '📅 Novo Evento de Transporte'}</h2>
-              {selSerial && <div style={{background:cor+'18',border:`1px solid ${cor}44`,borderRadius:'8px',padding:'8px 14px',marginBottom:'14px',fontSize:'13px',fontWeight:'700',color:cor}}>● Série: {selSerial}</div>}
-              <div className="form-row">
-                <FG label="Data"><input className="fi" type="date" value={form.event_date||''} onChange={e=>setForm(f=>({...f,event_date:e.target.value}))}/></FG>
-                <FG label="Tipo"><select className="fi" value={form.log_type||'Entrega'} onChange={e=>setForm(f=>({...f,log_type:e.target.value}))}>
-                  {['Entrega','Retirada','Manutenção','Instalação','Treinamento'].map(t=><option key={t}>{t}</option>)}
-                </select></FG>
-              </div>
-              <div className="form-row">
-                <FG label="Equipamento">
-                  <select className="fi" value={form.equip_id||''} onChange={e=>{
-                    const eq=eqFull[e.target.value]
-                    setForm(f=>({...f,equip_id:e.target.value,serial:eq?.serial||f.serial}))
-                  }}>
-                    <option value="">— Nenhum —</option>
-                    {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model} · {e.serial}</option>)}
-                  </select>
-                </FG>
-                <FG label="Nº de Série"><input className="fi" value={form.serial||''} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Ex: UQIA24043"/></FG>
-              </div>
-              <FG label="Loja de Destino / Origem">
-                <select className="fi" value={form.store||''} onChange={e=>setForm(f=>({...f,store:e.target.value}))}>
-                  <option value="">— Selecione a loja —</option>
-                  {['Butantã','Campo Limpo','Frei Caneca','Loja Conceito','Metro Tatuapé','Metro Tucuruvi','West Plaza','Moema','Osasco','Treinamento'].map(l=><option key={l}>{l}</option>)}
-                </select>
-              </FG>
-              <FG label="Descrição"><textarea className="fi" rows="2" value={form.description||''} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Detalhes do evento..."/></FG>
-              <ModalActions onCancel={()=>setModal(null)} onSave={saveLogistic}/>
-            </>})()
+            {modal==='logistic' && <LogisticModal
+              form={form} setForm={setForm} equipment={equipment} eqFull={eqFull}
+              SERIAL_COLORS={SERIAL_COLORS}
+              onCancel={()=>setModal(null)} onSave={saveLogistic}
+            />}
 
             {/* Fornecedor */}
             {modal==='vendor' && <>
@@ -1132,6 +1104,43 @@ function Badge({ status }) {
 
 function FG({ label, children }) {
   return <div style={{marginBottom:'14px'}}><label style={{display:'block',fontSize:'12px',fontWeight:'600',color:'#94a3b8',marginBottom:'6px'}}>{label}</label>{children}</div>
+}
+
+const LOJAS = ['Butantã','Campo Limpo','Frei Caneca','Loja Conceito','Metro Tatuapé','Metro Tucuruvi','West Plaza','Moema','Osasco','Treinamento']
+
+function LogisticModal({ form, setForm, equipment, eqFull, SERIAL_COLORS, onCancel, onSave }) {
+  const selSerial = form.serial || eqFull[form.equip_id]?.serial || ''
+  const cor = selSerial ? (SERIAL_COLORS[selSerial] || '#6366f1') : '#6366f1'
+  return <>
+    <h2>{form.id ? '✏️ Editar Evento' : '📅 Novo Evento de Transporte'}</h2>
+    {selSerial && <div style={{background:cor+'18',border:`1px solid ${cor}44`,borderRadius:'8px',padding:'8px 14px',marginBottom:'14px',fontSize:'13px',fontWeight:'700',color:cor}}>● Série: {selSerial}</div>}
+    <div className="form-row">
+      <FG label="Data"><input className="fi" type="date" value={form.event_date||''} onChange={e=>setForm(f=>({...f,event_date:e.target.value}))}/></FG>
+      <FG label="Tipo"><select className="fi" value={form.log_type||'Entrega'} onChange={e=>setForm(f=>({...f,log_type:e.target.value}))}>
+        {['Entrega','Retirada','Manutenção','Instalação','Treinamento'].map(t=><option key={t}>{t}</option>)}
+      </select></FG>
+    </div>
+    <div className="form-row">
+      <FG label="Equipamento">
+        <select className="fi" value={form.equip_id||''} onChange={e=>{
+          const eq = eqFull[e.target.value]
+          setForm(f=>({...f, equip_id:e.target.value, serial:eq?.serial||f.serial}))
+        }}>
+          <option value="">— Nenhum —</option>
+          {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model} · {e.serial}</option>)}
+        </select>
+      </FG>
+      <FG label="Nº de Série"><input className="fi" value={form.serial||''} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Ex: UQIA24043"/></FG>
+    </div>
+    <FG label="Loja de Destino / Origem">
+      <select className="fi" value={form.store||''} onChange={e=>setForm(f=>({...f,store:e.target.value}))}>
+        <option value="">— Selecione a loja —</option>
+        {LOJAS.map(l=><option key={l}>{l}</option>)}
+      </select>
+    </FG>
+    <FG label="Descrição"><textarea className="fi" rows="2" value={form.description||''} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Detalhes do evento..."/></FG>
+    <ModalActions onCancel={onCancel} onSave={onSave}/>
+  </>
 }
 
 function ModalActions({ onCancel, onSave, saveLabel='💾 Salvar' }) {
