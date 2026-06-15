@@ -9,11 +9,17 @@ const fmt = (v) => 'R$ ' + (parseFloat(v)||0).toLocaleString('pt-BR',{minimumFra
 const fmtDate = (d) => { if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('pt-BR') }
 const uid = () => crypto.randomUUID()
 const today = () => new Date().toISOString().split('T')[0]
-const statusColor = (s) => ({Operando:'#10b981',Manutenção:'#f59e0b',Inativo:'#ef4444',Estoque:'#8b5cf6',
-  Concluída:'#10b981',Aberta:'#6366f1','Em Andamento':'#f59e0b',Cancelada:'#ef4444'}[s]||'#64748b')
-const badgeCls = (s) => ({Operando:'success',Manutenção:'warning',Inativo:'danger',Estoque:'info',
-  Concluída:'success',Aberta:'blue','Em Andamento':'warning',Cancelada:'danger',
-  Ativo:'success',Inativo_:'danger',Administrador:'danger',Técnico:'warning',Operador:'blue',Visualizador:'gray'}[s]||'gray')
+const statusColor = (s) => ({
+  'Operando 100%':'#10b981','Operando Parcial':'#84cc16',Operando:'#10b981',
+  'Manutenção':'#f59e0b','Inativo':'#ef4444','Estoque':'#8b5cf6',
+  'Concluída':'#10b981','Aberta':'#6366f1','Em Andamento':'#f59e0b','Cancelada':'#ef4444'
+}[s]||'#64748b')
+const badgeCls = (s) => ({
+  'Operando 100%':'success','Operando Parcial':'success',Operando:'success',
+  'Manutenção':'warning','Inativo':'danger','Estoque':'info',
+  'Concluída':'success','Aberta':'blue','Em Andamento':'warning','Cancelada':'danger',
+  'Ativo':'success','Administrador':'danger','Técnico':'warning','Operador':'blue','Visualizador':'gray'
+}[s]||'gray')
 
 export default function Dashboard() {
   const router = useRouter()
@@ -107,19 +113,21 @@ export default function Dashboard() {
   async function saveEquipment() {
     const data = {
       brand: form.brand, model: form.model, serial: form.serial, type: form.type,
-      location: form.location, availability: form.availability, status: form.status,
-      acquisition_date: form.acquisition_date || null, notes: form.notes, created_by: user.id
+      unit: form.unit || null, location: form.location, availability: form.availability,
+      status: form.status, acquisition_date: form.acquisition_date || null,
+      notes: form.notes, created_by: user.id
     }
     if (!data.brand || !data.model) { showToast('Preencha marca e modelo.',true); return }
+    if (!data.serial) { showToast('Informe o número de série.',true); return }
+    let error
     if (form.id) {
-      await db.equipment.update(form.id, data)
-      await addAudit('Editou','Inventário',`${data.brand} ${data.model}`)
-      showToast('Equipamento atualizado!')
+      const res = await db.equipment.update(form.id, data); error = res.error
+      if (!error) { await addAudit('Editou','Inventário',`${data.brand} ${data.model}`); showToast('Equipamento atualizado!') }
     } else {
-      await db.equipment.insert(data)
-      await addAudit('Adicionou','Inventário',`${data.brand} ${data.model}`)
-      showToast('Equipamento adicionado!')
+      const res = await db.equipment.insert(data); error = res.error
+      if (!error) { await addAudit('Adicionou','Inventário',`${data.brand} ${data.model}`); showToast('Equipamento adicionado!') }
     }
+    if (error) { showToast('Erro ao salvar: ' + error.message, true); return }
     setModal(null); reload()
   }
 
@@ -156,7 +164,9 @@ export default function Dashboard() {
   }
 
   async function saveStop() {
-    await db.stops.insert({ equip_id: form.equip_id, start_date: form.start_date, end_date: form.end_date, reason: form.reason })
+    if (!form.start_date || !form.end_date) { showToast('Informe as datas de início e fim.',true); return }
+    const { error } = await db.stops.insert({ equip_id: form.equip_id||null, start_date: form.start_date, end_date: form.end_date, reason: form.reason||'' })
+    if (error) { showToast('Erro ao agendar: ' + error.message, true); return }
     await addAudit('Agendou Parada','Manutenções',`${form.start_date} → ${form.end_date}`)
     setModal(null); showToast('Parada agendada!'); reload()
   }
@@ -207,7 +217,8 @@ export default function Dashboard() {
 
   async function saveExpense() {
     if (!form.value) { showToast('Informe o valor.',true); return }
-    await db.expenses.insert({ expense_date: form.expense_date || today(), equip_id: form.equip_id||null, category: form.category, value: parseFloat(form.value), description: form.description })
+    const { error } = await db.expenses.insert({ expense_date: form.expense_date || today(), equip_id: form.equip_id||null, category: form.category, value: parseFloat(form.value), description: form.description })
+    if (error) { showToast('Erro ao registrar despesa: ' + error.message, true); return }
     await addAudit('Registrou Despesa','Financeiro', fmt(form.value))
     setModal(null); showToast('Despesa registrada!'); reload()
   }
@@ -238,7 +249,7 @@ export default function Dashboard() {
   // ── Computed ───────────────────────────────────────────
   const now = new Date()
   const openOrders = orders.filter(o => o.status === 'Aberta' || o.status === 'Em Andamento').length
-  const opEquip = equipment.filter(e => e.status === 'Operando').length
+  const opEquip = equipment.filter(e => e.status && e.status.startsWith('Operando')).length
   const monthExp = expenses.filter(e => {
     const d = new Date((e.expense_date||'')+'T00:00:00')
     return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()
@@ -426,7 +437,7 @@ export default function Dashboard() {
                 <option value="">Todos os Tipos</option>
                 {['Laser','Ultrassom','Estética','Diagnóstico','Outro'].map(t=><option key={t}>{t}</option>)}
               </select>
-              <button className="btn btn-primary" onClick={()=>{setForm({type:'Laser',availability:'Estoque',status:'Operando',acquisition_date:today()});setModal('equip')}}>➕ Adicionar Equipamento</button>
+              <button className="btn btn-primary" onClick={()=>{setForm({availability:'Em Uso',status:'Operando 100%',acquisition_date:today()});setModal('equip')}}>➕ Adicionar Equipamento</button>
             </div>
             <div className="card" style={{padding:0}}>
               <div className="table-wrap">
