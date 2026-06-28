@@ -54,6 +54,13 @@ export default function Dashboard() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth())
   const [inviteLink, setInviteLink] = useState('')
 
+  // Tips state
+  const [tips, setTips]             = useState([])
+  const [tipMovements, setTipMovements] = useState([])
+  const [tipPurchases, setTipPurchases] = useState([])
+  const [tipAudits, setTipAudits]   = useState([])
+  const [tipsTab, setTipsTab]       = useState('resumo')
+
   // ── Auth ───────────────────────────────────────────────
   useEffect(() => {
     getClient().auth.getSession().then(({ data: { session } }) => {
@@ -69,11 +76,12 @@ export default function Dashboard() {
 
   async function loadAll(u) {
     setLoading(true)
-    const [eq, or, st, lo, ve, ex, au, pr, un, ss, et] = await Promise.all([
+    const [eq, or, st, lo, ve, ex, au, pr, un, ss, et, tp, tm, tpu, ta] = await Promise.all([
       db.equipment.getAll(), db.orders.getAll(), db.stops.getAll(),
       db.logistics.getAll(), db.vendors.getAll(), db.expenses.getAll(),
       db.audit.getAll(), db.profiles.getAll(),
-      db.units.getAll(), db.statuses.getAll(), db.equipment_types.getAll()
+      db.units.getAll(), db.statuses.getAll(), db.equipment_types.getAll(),
+      db.tips.getAll(), db.tip_movements.getAll(), db.tip_purchases.getAll(), db.tip_audits.getAll()
     ])
     setEquipment(eq.data || [])
     setOrders(or.data || [])
@@ -86,6 +94,10 @@ export default function Dashboard() {
     setUnits(un.data || [])
     setStatuses(ss.data || [])
     setEqTypes(et.data || [])
+    setTips(tp.data || [])
+    setTipMovements(tm.data || [])
+    setTipPurchases(tpu.data || [])
+    setTipAudits(ta.data || [])
     // load own profile
     const { data: prof } = await getClient().from('profiles').select('*').eq('id', u.id).single()
     setProfile(prof)
@@ -227,6 +239,119 @@ export default function Dashboard() {
     await db.expenses.delete(id); showToast('Despesa removida.'); reload()
   }
 
+  // ── Tips CRUD ──────────────────────────────────────────────
+  const TIP_TYPES = ['1.5 DOT','2.0 DOT','3.0 DOT','3.0 LINEAR','4.5 DOT','6.0 LINEAR','9.0 LINEAR','13.0 LINEAR']
+  const TIP_MAX_SHOTS = {'1.5 DOT':10000,'2.0 DOT':10000,'3.0 DOT':10000,'3.0 LINEAR':20000,'4.5 DOT':10000,'6.0 LINEAR':20000,'9.0 LINEAR':20000,'13.0 LINEAR':20000}
+  const TIP_PRICE = {'1.5 DOT':5000,'2.0 DOT':5000,'3.0 DOT':5000,'4.5 DOT':5000,'3.0 LINEAR':9000,'6.0 LINEAR':9000,'9.0 LINEAR':9000,'13.0 LINEAR':9000}
+  const LOJAS_TIP = ['Butantã','Campo Limpo','Frei Caneca','Loja Conceito','Metro Tatuapé','Metro Tucuruvi','West Plaza','Moema','Osasco','Treinamento','Estoque']
+
+  function tipAlertPct(tip) { return tip.total_shots > 0 ? tip.current_shots / tip.total_shots : 1 }
+
+  async function saveTip() {
+    const data = {
+      serial: form.serial, tip_type: form.tip_type,
+      equipment_id: form.equipment_id || null,
+      total_shots: parseInt(form.total_shots) || TIP_MAX_SHOTS[form.tip_type] || 10000,
+      current_shots: parseInt(form.current_shots) || parseInt(form.total_shots) || TIP_MAX_SHOTS[form.tip_type] || 10000,
+      status: form.status || 'Ativa',
+      current_unit: form.current_unit || '',
+      purchase_order: form.purchase_order || '',
+      purchase_date: form.purchase_date || null,
+      price: parseFloat(form.price) || TIP_PRICE[form.tip_type] || 5000,
+      notes: form.notes || ''
+    }
+    if (!data.serial) { showToast('Informe o número de série.',true); return }
+    if (!data.tip_type) { showToast('Selecione o tipo de ponteira.',true); return }
+    let error
+    if (form.id) {
+      const res = await db.tips.update(form.id, data); error = res.error
+      if (!error) showToast('Ponteira atualizada!')
+    } else {
+      const res = await db.tips.insert(data); error = res.error
+      if (!error) { await addAudit('Cadastrou Ponteira','Ponteiras',`${data.tip_type} · ${data.serial}`); showToast('Ponteira cadastrada!') }
+    }
+    if (error) { showToast('Erro: ' + error.message, true); return }
+    setModal(null); reload()
+  }
+
+  async function deleteTip(id) {
+    if (!confirm('Remover esta ponteira?')) return
+    await db.tips.delete(id); showToast('Ponteira removida.'); reload()
+  }
+
+  async function saveTipMovement() {
+    const tip = tips.find(t => t.id === form.tip_id)
+    if (!tip) { showToast('Selecione a ponteira.',true); return }
+    if (!form.unit) { showToast('Informe a unidade.',true); return }
+    if (!form.movement_date) { showToast('Informe a data.',true); return }
+    const shotsIn  = parseInt(form.shots_in) || 0
+    const shotsOut = parseInt(form.shots_out) || 0
+    const newShots = tip.current_shots + shotsIn - shotsOut
+    const data = {
+      tip_id: form.tip_id, movement_date: form.movement_date,
+      unit: form.unit, movement_type: form.movement_type || 'Chegada',
+      shots_in: shotsIn, shots_out: shotsOut,
+      shots_balance: newShots, notes: form.notes || '', created_by: user.id
+    }
+    const { error } = await db.tip_movements.insert(data)
+    if (error) { showToast('Erro: ' + error.message, true); return }
+    // update tip current shots
+    let newStatus = tip.status
+    if (newShots <= 0) newStatus = 'Zerada'
+    else if (newShots / tip.total_shots <= 0.2) newStatus = 'Alerta'
+    else newStatus = 'Ativa'
+    await db.tips.update(form.tip_id, { current_shots: Math.max(0, newShots), current_unit: form.unit, status: newStatus })
+    await addAudit('Movimentação Ponteira','Ponteiras',`${tip.tip_type} ${form.movement_type} → ${form.unit}`)
+    setModal(null); showToast('Movimentação registrada!'); reload()
+  }
+
+  async function saveTipPurchase() {
+    if (!form.purchase_number || !form.purchase_date) { showToast('Informe número e data da compra.',true); return }
+    const data = {
+      purchase_number: form.purchase_number, purchase_date: form.purchase_date,
+      tip_type: form.tip_type || '', serial: form.serial || '',
+      quantity: parseInt(form.quantity) || 1,
+      price: parseFloat(form.price) || 0, notes: form.notes || ''
+    }
+    const { error } = await db.tip_purchases.insert(data)
+    if (error) { showToast('Erro: ' + error.message, true); return }
+    await addAudit('Compra Ponteira','Ponteiras',data.purchase_number)
+    setModal(null); showToast('Compra registrada!'); reload()
+  }
+
+  async function saveTipAudit() {
+    if (!form.unit || !form.audit_week) { showToast('Informe unidade e semana.',true); return }
+    const shotsPerSess = parseInt(form.shots_per_session) || 0
+    const services = parseInt(form.services_count) || 0
+    const expected = shotsPerSess * services
+    const actual = parseInt(form.actual_shots) || 0
+    const diff = Math.abs(expected - actual)
+    const pct = expected > 0 ? diff / expected : 0
+    const status = pct > 0.1 ? 'Divergência' : 'Concluída'
+    const data = {
+      audit_week: form.audit_week, unit: form.unit, tip_id: form.tip_id || null,
+      tip_type: form.tip_type || '', expected_shots: expected, actual_shots: actual,
+      services_count: services, shots_per_session: shotsPerSess,
+      status, notes: form.notes || '', created_by: user.id
+    }
+    const { error } = await db.tip_audits.insert(data)
+    if (error) { showToast('Erro: ' + error.message, true); return }
+    await addAudit('Auditoria Ponteira','Ponteiras',`${form.unit} · ${status}`)
+    setModal(null); showToast('Auditoria registrada!'); reload()
+  }
+
+  function pickAuditUnit() {
+    const week = new Date(); week.setDate(week.getDate() - week.getDay())
+    const weekStr = week.toISOString().split('T')[0]
+    const already = tipAudits.find(a => a.audit_week === weekStr)
+    if (already) { showToast(`Auditoria desta semana já registrada: ${already.unit}`); return }
+    // pick deterministically by week number so it's the same for everyone
+    const wn = Math.floor(week / (7*24*3600*1000))
+    const chosen = LOJAS_TIP[wn % LOJAS_TIP.length]
+    setForm({ audit_week: weekStr, unit: chosen })
+    setModal('auditoria')
+  }
+
   // Invite user via Edge Function
   async function inviteUserAction() {
     if (!form.inv_email || !form.inv_name) { showToast('Preencha nome e e-mail.',true); return }
@@ -321,7 +446,8 @@ export default function Dashboard() {
 
         <div className="nav-section"><div className="nav-label">Menu Principal</div>
           {[['dashboard','📊','Dashboard'],['inventory','📦','Inventário'],['maintenance','🔩','Manutenções'],
-            ['logistics','📅','Calendário de Logística'],['vendors','🏭','Fornecedores'],['financial','💰','Relatórios Financeiros']
+            ['logistics','📅','Calendário de Logística'],['vendors','🏭','Fornecedores'],
+            ['tips','💡','Gestão de Ponteiras'],['financial','💰','Relatórios Financeiros']
           ].map(([id,icon,label])=>(
             <button key={id} className={`nav-item${page===id?' active':''}`} onClick={()=>setPage(id)}>
               <span className="nav-icon">{icon}</span> {label}
@@ -354,7 +480,7 @@ export default function Dashboard() {
         <span style={{fontWeight:'700',fontSize:'17px',color:'#1e293b'}}>
           {{dashboard:'Dashboard',inventory:'Inventário de Equipamentos',maintenance:'Gestão de Manutenções',
             logistics:'Calendário de Logística',vendors:'Gestão de Fornecedores',financial:'Relatórios Financeiros',
-            users:'Gestão de Usuários',audit:'Auditoria de Ações'}[page]}
+            tips:'Gestão e Compra de Ponteiras',users:'Gestão de Usuários',audit:'Auditoria de Ações'}[page]}
         </span>
         <div className="header-search">
           <span style={{color:'#64748b'}}>🔍</span>
@@ -827,6 +953,337 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ══ PONTEIRAS ══ */}
+        {page==='tips' && (
+          <div>
+            {/* KPIs */}
+            <div className="kpi-grid" style={{marginBottom:'20px'}}>
+              <KPI icon="💡" value={tips.length} label="Total de Ponteiras" sub="Cadastradas no sistema" color="#6366f1"/>
+              <KPI icon="⚠️" value={tips.filter(t=>tipAlertPct(t)<=0.2&&t.status!=='Zerada').length} label="Em Alerta (≤20%)" sub="Necessitam reposição" color="#f59e0b"/>
+              <KPI icon="🔴" value={tips.filter(t=>t.status==='Zerada').length} label="Zeradas" sub="Sem disparos restantes" color="#ef4444"/>
+              <KPI icon="📋" value={tipAudits.filter(a=>a.status==='Pendente').length} label="Auditorias Pendentes" sub="Aguardando preenchimento" color="#0ea5e9"/>
+            </div>
+
+            {/* Alert banner */}
+            {tips.filter(t=>tipAlertPct(t)<=0.2).length > 0 && (
+              <div style={{background:'#fef3c7',border:'1px solid #f59e0b',borderRadius:'10px',padding:'12px 16px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'10px'}}>
+                <span style={{fontSize:'20px'}}>⚠️</span>
+                <div>
+                  <strong style={{color:'#92400e'}}>Atenção: {tips.filter(t=>tipAlertPct(t)<=0.2).length} ponteira(s) com menos de 20% de disparos!</strong>
+                  <div style={{fontSize:'12px',color:'#a16207',marginTop:'2px'}}>
+                    {tips.filter(t=>tipAlertPct(t)<=0.2).map(t=>`${t.tip_type} · ${t.serial} (${Math.round(tipAlertPct(t)*100)}%)`).join(' | ')}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tabs */}
+            <div className="tabs">
+              {[['resumo','📊 Resumo'],['ponteiras','💡 Ponteiras'],['movimentacoes','🔄 Movimentações'],['compras','🛒 Compras'],['auditoria','🔍 Auditoria']].map(([k,l])=>(
+                <button key={k} className={`tab-btn${tipsTab===k?' active':''}`} onClick={()=>setTipsTab(k)}>{l}</button>
+              ))}
+            </div>
+
+            {/* ── RESUMO ── */}
+            {tipsTab==='resumo' && (
+              <div>
+                <div className="card" style={{marginBottom:'16px'}}>
+                  <div style={{fontWeight:'700',fontSize:'15px',marginBottom:'16px'}}>Estoque por Tipo de Ponteira</div>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead>
+                        <tr style={{background:'#f8fafc'}}>
+                          <th style={{padding:'10px 12px',textAlign:'left',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Tipo</th>
+                          <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Total</th>
+                          <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Ativas</th>
+                          <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>⚠️ Alerta</th>
+                          <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#ef4444',borderBottom:'2px solid #e2e8f0'}}>Zeradas</th>
+                          <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Preço Unit.</th>
+                          <th style={{padding:'10px 12px',textAlign:'left',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Ponteiras Zeradas (S/N)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TIP_TYPES.map(tt => {
+                          const ofType = tips.filter(t=>t.tip_type===tt)
+                          const alert = ofType.filter(t=>tipAlertPct(t)<=0.2&&t.status!=='Zerada')
+                          const zero = ofType.filter(t=>t.status==='Zerada')
+                          const active = ofType.filter(t=>t.status==='Ativa')
+                          return (
+                            <tr key={tt} style={{borderBottom:'1px solid #f1f5f9'}}>
+                              <td style={{padding:'12px',fontWeight:'600',fontSize:'13px'}}>{tt}</td>
+                              <td style={{padding:'12px',textAlign:'center'}}><span className="badge badge-gray">{ofType.length}</span></td>
+                              <td style={{padding:'12px',textAlign:'center'}}><span className="badge badge-success">{active.length}</span></td>
+                              <td style={{padding:'12px',textAlign:'center'}}>
+                                {alert.length>0 ? <span className="badge badge-warning">{alert.length}</span> : <span style={{color:'#94a3b8',fontSize:'12px'}}>—</span>}
+                              </td>
+                              <td style={{padding:'12px',textAlign:'center'}}>
+                                {zero.length>0 ? <span className="badge badge-danger">{zero.length}</span> : <span style={{color:'#94a3b8',fontSize:'12px'}}>—</span>}
+                              </td>
+                              <td style={{padding:'12px',textAlign:'center',fontSize:'13px',color:'#64748b'}}>{fmt(TIP_PRICE[tt]||0)}</td>
+                              <td style={{padding:'12px',fontSize:'11px',color:'#64748b',maxWidth:'300px',wordBreak:'break-all'}}>
+                                {zero.map(t=>t.serial).join(' · ') || '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Por equipamento */}
+                <div className="card">
+                  <div style={{fontWeight:'700',fontSize:'15px',marginBottom:'16px'}}>Ponteiras por Equipamento</div>
+                  {equipment.map(eq => {
+                    const eqTips = tips.filter(t=>t.equipment_id===eq.id)
+                    if(!eqTips.length) return null
+                    const eqColor = SERIAL_COLORS[eq.serial] || '#6366f1'
+                    return (
+                      <div key={eq.id} style={{marginBottom:'16px',borderLeft:`3px solid ${eqColor}`,paddingLeft:'12px'}}>
+                        <div style={{fontWeight:'700',fontSize:'13px',color:eqColor,marginBottom:'8px'}}>
+                          {eq.brand} {eq.model} · S/N {eq.serial}
+                        </div>
+                        <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                          {eqTips.map(t => {
+                            const pct = tipAlertPct(t)
+                            const barColor = t.status==='Zerada' ? '#ef4444' : pct<=0.2 ? '#f59e0b' : '#10b981'
+                            return (
+                              <div key={t.id} style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'8px',padding:'10px 14px',minWidth:'180px'}}>
+                                <div style={{fontSize:'12px',fontWeight:'700',marginBottom:'4px'}}>{t.tip_type}</div>
+                                <div style={{fontSize:'11px',color:'#64748b',marginBottom:'6px'}}>{t.serial}</div>
+                                <div style={{background:'#e2e8f0',borderRadius:'4px',height:'6px',marginBottom:'4px'}}>
+                                  <div style={{background:barColor,height:'6px',borderRadius:'4px',width:`${Math.min(100,Math.round(pct*100))}%`}}/>
+                                </div>
+                                <div style={{fontSize:'11px',color:barColor,fontWeight:'600'}}>{t.current_shots.toLocaleString('pt-BR')} / {t.total_shots.toLocaleString('pt-BR')} ({Math.round(pct*100)}%)</div>
+                                {t.current_unit && <div style={{fontSize:'10px',color:'#94a3b8',marginTop:'2px'}}>📍 {t.current_unit}</div>}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {tips.filter(t=>!t.equipment_id).length > 0 && (
+                    <div style={{borderLeft:'3px solid #94a3b8',paddingLeft:'12px'}}>
+                      <div style={{fontWeight:'700',fontSize:'13px',color:'#64748b',marginBottom:'8px'}}>Sem Equipamento Vinculado</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                        {tips.filter(t=>!t.equipment_id).map(t=>{
+                          const pct = tipAlertPct(t)
+                          const barColor = t.status==='Zerada'?'#ef4444':pct<=0.2?'#f59e0b':'#10b981'
+                          return (
+                            <div key={t.id} style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'8px',padding:'10px 14px',minWidth:'180px'}}>
+                              <div style={{fontSize:'12px',fontWeight:'700',marginBottom:'4px'}}>{t.tip_type}</div>
+                              <div style={{fontSize:'11px',color:'#64748b',marginBottom:'6px'}}>{t.serial}</div>
+                              <div style={{background:'#e2e8f0',borderRadius:'4px',height:'6px',marginBottom:'4px'}}>
+                                <div style={{background:barColor,height:'6px',borderRadius:'4px',width:`${Math.min(100,Math.round(pct*100))}%`}}/>
+                              </div>
+                              <div style={{fontSize:'11px',color:barColor,fontWeight:'600'}}>{t.current_shots.toLocaleString('pt-BR')} / {t.total_shots.toLocaleString('pt-BR')} ({Math.round(pct*100)}%)</div>
+                              {t.current_unit && <div style={{fontSize:'10px',color:'#94a3b8',marginTop:'2px'}}>📍 {t.current_unit}</div>}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {!tips.length && <Empty icon="💡" msg="Nenhuma ponteira cadastrada ainda."/>}
+                </div>
+              </div>
+            )}
+
+            {/* ── PONTEIRAS ── */}
+            {tipsTab==='ponteiras' && (
+              <div>
+                <div className="search-bar">
+                  <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Cadastro e controle individual de ponteiras.</span>
+                  <button className="btn btn-primary" onClick={()=>{setForm({});setModal('newTip')}}>➕ Nova Ponteira</button>
+                </div>
+                <div className="card" style={{padding:0}}>
+                  <div className="table-wrap">
+                    <table><thead><tr><th>Tipo</th><th>N° Série</th><th>Equipamento</th><th>Disparos</th><th>Restante</th><th>Status</th><th>Unidade</th><th>Pedido</th><th>Ações</th></tr></thead>
+                    <tbody>
+                      {tips.map(t=>{
+                        const pct = tipAlertPct(t)
+                        const barColor = t.status==='Zerada'?'#ef4444':pct<=0.2?'#f59e0b':'#10b981'
+                        const eq = t.equipment_id && eqFull[t.equipment_id]
+                        return (
+                          <tr key={t.id} style={pct<=0.2?{background:'#fffbeb'}:{}}>
+                            <td><strong>{t.tip_type}</strong></td>
+                            <td style={{fontSize:'11px',fontFamily:'monospace'}}>{t.serial}</td>
+                            <td className="muted" style={{fontSize:'12px'}}>{eq ? `${eq.brand} ${eq.model}` : '—'}</td>
+                            <td>
+                              <div style={{background:'#e2e8f0',borderRadius:'4px',height:'8px',width:'100px',marginBottom:'3px'}}>
+                                <div style={{background:barColor,height:'8px',borderRadius:'4px',width:`${Math.min(100,Math.round(pct*100))}%`}}/>
+                              </div>
+                              <div style={{fontSize:'11px',color:barColor,fontWeight:'600'}}>{Math.round(pct*100)}%</div>
+                            </td>
+                            <td style={{fontSize:'12px'}}><strong style={{color:barColor}}>{t.current_shots.toLocaleString('pt-BR')}</strong> / {t.total_shots.toLocaleString('pt-BR')}</td>
+                            <td>
+                              <span className={`badge badge-${t.status==='Zerada'?'danger':t.status==='Alerta'?'warning':'success'}`}>
+                                {t.status==='Alerta'?'⚠️ ':''}{t.status}
+                              </span>
+                            </td>
+                            <td className="muted" style={{fontSize:'12px'}}>{t.current_unit||'—'}</td>
+                            <td className="muted" style={{fontSize:'11px'}}>{t.purchase_order||'—'}</td>
+                            <td>
+                              <div style={{display:'flex',gap:'4px'}}>
+                                <button className="btn btn-outline btn-sm" onClick={()=>{setForm({...t});setModal('newTip')}}>✏️</button>
+                                <button className="btn btn-danger btn-sm" onClick={()=>deleteTip(t.id)}>🗑</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {!tips.length && <tr><td colSpan="9" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma ponteira cadastrada.</td></tr>}
+                    </tbody></table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── MOVIMENTAÇÕES ── */}
+            {tipsTab==='movimentacoes' && (
+              <div>
+                <div className="search-bar">
+                  <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Registre chegada e saída de ponteiras nas unidades.</span>
+                  <button className="btn btn-primary" onClick={()=>{setForm({movement_date:today(),movement_type:'Chegada'});setModal('newMovement')}}>➕ Registrar Movimentação</button>
+                </div>
+                <div className="card" style={{padding:0}}>
+                  <div className="table-wrap">
+                    <table><thead><tr><th>Data</th><th>Ponteira</th><th>Tipo</th><th>Unidade</th><th>Chegada</th><th>Saída</th><th>Saldo</th><th>Observações</th></tr></thead>
+                    <tbody>
+                      {tipMovements.map(m=>(
+                        <tr key={m.id}>
+                          <td className="muted">{fmtDate(m.movement_date)}</td>
+                          <td style={{fontSize:'11px',fontFamily:'monospace'}}>{m.tips?.serial||'—'}<br/><span style={{color:'#94a3b8',fontSize:'10px'}}>{m.tips?.tip_type||''}</span></td>
+                          <td><span className={`badge badge-${m.movement_type==='Chegada'?'success':m.movement_type==='Saída'?'warning':'blue'}`}>{m.movement_type}</span></td>
+                          <td>{m.unit}</td>
+                          <td style={{color:'#10b981',fontWeight:'600'}}>{m.shots_in>0?'+'+m.shots_in.toLocaleString('pt-BR'):'—'}</td>
+                          <td style={{color:'#ef4444',fontWeight:'600'}}>{m.shots_out>0?'-'+m.shots_out.toLocaleString('pt-BR'):'—'}</td>
+                          <td style={{fontWeight:'700'}}>{m.shots_balance?.toLocaleString('pt-BR')??'—'}</td>
+                          <td className="muted" style={{fontSize:'11px'}}>{m.notes||'—'}</td>
+                        </tr>
+                      ))}
+                      {!tipMovements.length && <tr><td colSpan="8" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma movimentação registrada.</td></tr>}
+                    </tbody></table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── COMPRAS ── */}
+            {tipsTab==='compras' && (
+              <div>
+                <div className="search-bar">
+                  <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Controle de pedidos e compras de ponteiras.</span>
+                  <button className="btn btn-primary" onClick={()=>{setForm({purchase_date:today()});setModal('newPurchase')}}>➕ Registrar Compra</button>
+                </div>
+                <div className="card" style={{marginBottom:'16px'}}>
+                  <div style={{display:'flex',gap:'24px',flexWrap:'wrap'}}>
+                    <div><div style={{fontSize:'11px',color:'#64748b',marginBottom:'2px'}}>Total investido</div>
+                      <div style={{fontSize:'22px',fontWeight:'800',color:'#1e293b'}}>{fmt(tipPurchases.reduce((s,p)=>s+(parseFloat(p.price)||0),0))}</div>
+                    </div>
+                    <div><div style={{fontSize:'11px',color:'#64748b',marginBottom:'2px'}}>DOT (R$ 5.000/un)</div>
+                      <div style={{fontSize:'18px',fontWeight:'700',color:'#6366f1'}}>{tipPurchases.filter(p=>p.tip_type?.includes('DOT')).reduce((s,p)=>s+(parseInt(p.quantity)||0),0)} un</div>
+                    </div>
+                    <div><div style={{fontSize:'11px',color:'#64748b',marginBottom:'2px'}}>LINEAR (R$ 9.000/un)</div>
+                      <div style={{fontSize:'18px',fontWeight:'700',color:'#0ea5e9'}}>{tipPurchases.filter(p=>p.tip_type?.includes('LINEAR')).reduce((s,p)=>s+(parseInt(p.quantity)||0),0)} un</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="card" style={{padding:0}}>
+                  <div className="table-wrap">
+                    <table><thead><tr><th>Pedido</th><th>Data</th><th>Tipo</th><th>N° Série</th><th>Qtd</th><th>Valor</th><th>Observações</th><th>Ações</th></tr></thead>
+                    <tbody>
+                      {tipPurchases.map(p=>(
+                        <tr key={p.id}>
+                          <td><strong style={{fontFamily:'monospace',fontSize:'12px'}}>{p.purchase_number}</strong></td>
+                          <td className="muted">{fmtDate(p.purchase_date)}</td>
+                          <td><span className="badge badge-blue">{p.tip_type||'—'}</span></td>
+                          <td style={{fontSize:'11px',fontFamily:'monospace'}}>{p.serial||'—'}</td>
+                          <td style={{textAlign:'center'}}>{p.quantity||1}</td>
+                          <td><strong>{fmt(p.price)}</strong></td>
+                          <td className="muted" style={{fontSize:'11px'}}>{p.notes||'—'}</td>
+                          <td>
+                            <button className="btn btn-danger btn-sm" onClick={async()=>{
+                              if(!confirm('Remover compra?')) return
+                              await db.tip_purchases.delete(p.id); showToast('Removido.'); reload()
+                            }}>🗑</button>
+                          </td>
+                        </tr>
+                      ))}
+                      {!tipPurchases.length && <tr><td colSpan="8" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma compra registrada.</td></tr>}
+                    </tbody></table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── AUDITORIA ── */}
+            {tipsTab==='auditoria' && (
+              <div>
+                <div className="search-bar">
+                  <span style={{fontSize:'13px',color:'#64748b',flex:1}}>Auditoria semanal: disparos × serviços realizados por unidade.</span>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <button className="btn btn-outline" onClick={pickAuditUnit}>🎲 Sortear Unidade da Semana</button>
+                    <button className="btn btn-primary" onClick={()=>{setForm({audit_week:today(),movement_type:'Auditoria'});setModal('auditoria')}}>➕ Nova Auditoria</button>
+                  </div>
+                </div>
+
+                {/* Semana atual */}
+                {(()=>{
+                  const week = new Date(); week.setDate(week.getDate()-week.getDay())
+                  const weekStr = week.toISOString().split('T')[0]
+                  const cur = tipAudits.find(a=>a.audit_week===weekStr)
+                  const wn = Math.floor(week / (7*24*3600*1000))
+                  const sorteada = LOJAS_TIP[wn % LOJAS_TIP.length]
+                  return (
+                    <div style={{background: cur ? (cur.status==='Divergência'?'#fef2f2':'#f0fdf4') : '#eff6ff',border:`1px solid ${cur?(cur.status==='Divergência'?'#fecaca':'#bbf7d0'):'#bfdbfe'}`,borderRadius:'10px',padding:'14px 18px',marginBottom:'16px',display:'flex',alignItems:'center',gap:'12px',flexWrap:'wrap'}}>
+                      <span style={{fontSize:'24px'}}>{cur?'📋':'🎯'}</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:'700',color:'#1e293b',fontSize:'14px'}}>
+                          {cur ? `Auditoria desta semana: ${cur.unit} — ${cur.status}` : `Unidade sorteada esta semana: ${sorteada}`}
+                        </div>
+                        <div style={{fontSize:'12px',color:'#64748b',marginTop:'2px'}}>
+                          {cur ? `${cur.services_count} serviços · ${cur.actual_shots} disparos reais · ${cur.expected_shots} esperados` : 'Clique em "Sortear Unidade" para confirmar e iniciar a auditoria'}
+                        </div>
+                      </div>
+                      {!cur && <button className="btn btn-primary btn-sm" onClick={pickAuditUnit}>Iniciar Auditoria</button>}
+                    </div>
+                  )
+                })()}
+
+                <div className="card" style={{padding:0}}>
+                  <div className="table-wrap">
+                    <table><thead><tr><th>Semana</th><th>Unidade</th><th>Ponteira</th><th>Serviços</th><th>Disp./Sessão</th><th>Esperados</th><th>Reais</th><th>Diferença</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {tipAudits.map(a=>{
+                        const diff = a.expected_shots - a.actual_shots
+                        const pct = a.expected_shots > 0 ? Math.abs(diff)/a.expected_shots*100 : 0
+                        return (
+                          <tr key={a.id}>
+                            <td className="muted">{fmtDate(a.audit_week)}</td>
+                            <td><strong>{a.unit}</strong></td>
+                            <td style={{fontSize:'11px'}}>{a.tip_type||'—'}<br/><span style={{color:'#94a3b8',fontSize:'10px'}}>{a.tips?.serial||''}</span></td>
+                            <td style={{textAlign:'center'}}>{a.services_count}</td>
+                            <td style={{textAlign:'center'}}>{a.shots_per_session}</td>
+                            <td style={{textAlign:'center',fontWeight:'600'}}>{a.expected_shots?.toLocaleString('pt-BR')}</td>
+                            <td style={{textAlign:'center',fontWeight:'600'}}>{a.actual_shots?.toLocaleString('pt-BR')}</td>
+                            <td style={{textAlign:'center',color:Math.abs(diff)>0?'#ef4444':'#10b981',fontWeight:'700'}}>
+                              {diff!==0?(diff>0?'+':'')+diff.toLocaleString('pt-BR')+` (${Math.round(pct)}%)`:'OK'}
+                            </td>
+                            <td><span className={`badge badge-${a.status==='Concluída'?'success':a.status==='Divergência'?'danger':'warning'}`}>{a.status}</span></td>
+                          </tr>
+                        )
+                      })}
+                      {!tipAudits.length && <tr><td colSpan="9" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma auditoria registrada.</td></tr>}
+                    </tbody></table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ══ AUDITORIA ══ */}
         {page==='audit' && (
           <Card title="📋 Registro de Auditoria" sub="Todas as ações realizadas no sistema">
@@ -853,6 +1310,149 @@ export default function Dashboard() {
       {modal && (
         <div className="modal-overlay" onClick={e=>{if(e.target.className==='modal-overlay')setModal(null)}}>
           <div className="modal">
+
+            {/* ── Nova Ponteira ── */}
+            {modal==='newTip' && <>
+              <h2>{form.id?'✏️ Editar Ponteira':'💡 Nova Ponteira'}</h2>
+              <div className="form-row">
+                <FG label="Tipo de Ponteira">
+                  <select className="fi" value={form.tip_type||''} onChange={e=>setForm(f=>({...f,tip_type:e.target.value,total_shots:TIP_MAX_SHOTS[e.target.value]||10000,current_shots:f.id?f.current_shots:(TIP_MAX_SHOTS[e.target.value]||10000),price:TIP_PRICE[e.target.value]||5000}))}>
+                    <option value="">— Selecione —</option>
+                    {TIP_TYPES.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </FG>
+                <FG label="N° de Série"><input className="fi" value={form.serial||''} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Ex: A01698A00-23071440058KJ"/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="Equipamento Vinculado">
+                  <select className="fi" value={form.equipment_id||''} onChange={e=>setForm(f=>({...f,equipment_id:e.target.value}))}>
+                    <option value="">— Nenhum —</option>
+                    {equipment.map(e=><option key={e.id} value={e.id}>{e.brand} {e.model} · {e.serial}</option>)}
+                  </select>
+                </FG>
+                <FG label="Unidade Atual">
+                  <select className="fi" value={form.current_unit||''} onChange={e=>setForm(f=>({...f,current_unit:e.target.value}))}>
+                    <option value="">— Selecione —</option>
+                    {LOJAS_TIP.map(l=><option key={l}>{l}</option>)}
+                  </select>
+                </FG>
+              </div>
+              <div className="form-row">
+                <FG label="Total de Disparos"><input className="fi" type="number" value={form.total_shots||''} onChange={e=>setForm(f=>({...f,total_shots:e.target.value}))}/></FG>
+                <FG label="Disparos Atuais"><input className="fi" type="number" value={form.current_shots||''} onChange={e=>setForm(f=>({...f,current_shots:e.target.value}))}/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="Pedido de Compra"><input className="fi" value={form.purchase_order||''} onChange={e=>setForm(f=>({...f,purchase_order:e.target.value}))} placeholder="Ex: PEDIDO C030_2026"/></FG>
+                <FG label="Data da Compra"><input className="fi" type="date" value={form.purchase_date||''} onChange={e=>setForm(f=>({...f,purchase_date:e.target.value}))}/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="Status">
+                  <select className="fi" value={form.status||'Ativa'} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
+                    {['Ativa','Reserva','Alerta','Zerada'].map(s=><option key={s}>{s}</option>)}
+                  </select>
+                </FG>
+                <FG label="Preço (R$)"><input className="fi" type="number" value={form.price||''} onChange={e=>setForm(f=>({...f,price:e.target.value}))}/></FG>
+              </div>
+              <FG label="Observações"><textarea className="fi" rows="2" value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={saveTip}/>
+            </>}
+
+            {/* ── Movimentação de Ponteira ── */}
+            {modal==='newMovement' && <>
+              <h2>🔄 Registrar Movimentação</h2>
+              <div className="form-row">
+                <FG label="Ponteira">
+                  <select className="fi" value={form.tip_id||''} onChange={e=>setForm(f=>({...f,tip_id:e.target.value}))}>
+                    <option value="">— Selecione —</option>
+                    {tips.map(t=><option key={t.id} value={t.id}>{t.tip_type} · {t.serial} ({t.current_shots?.toLocaleString('pt-BR')} disp.)</option>)}
+                  </select>
+                </FG>
+                <FG label="Tipo">
+                  <select className="fi" value={form.movement_type||'Chegada'} onChange={e=>setForm(f=>({...f,movement_type:e.target.value}))}>
+                    {['Chegada','Saída','Auditoria'].map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </FG>
+              </div>
+              <div className="form-row">
+                <FG label="Unidade">
+                  <select className="fi" value={form.unit||''} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}>
+                    <option value="">— Selecione —</option>
+                    {LOJAS_TIP.map(l=><option key={l}>{l}</option>)}
+                  </select>
+                </FG>
+                <FG label="Data"><input className="fi" type="date" value={form.movement_date||''} onChange={e=>setForm(f=>({...f,movement_date:e.target.value}))}/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="Disparos de Chegada"><input className="fi" type="number" min="0" value={form.shots_in||''} onChange={e=>setForm(f=>({...f,shots_in:e.target.value}))} placeholder="0"/></FG>
+                <FG label="Disparos de Saída"><input className="fi" type="number" min="0" value={form.shots_out||''} onChange={e=>setForm(f=>({...f,shots_out:e.target.value}))} placeholder="0"/></FG>
+              </div>
+              <FG label="Observações"><textarea className="fi" rows="2" value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={saveTipMovement}/>
+            </>}
+
+            {/* ── Compra de Ponteira ── */}
+            {modal==='newPurchase' && <>
+              <h2>🛒 Registrar Compra de Ponteira</h2>
+              <div className="form-row">
+                <FG label="N° do Pedido"><input className="fi" value={form.purchase_number||''} onChange={e=>setForm(f=>({...f,purchase_number:e.target.value}))} placeholder="Ex: PEDIDO C031_2026"/></FG>
+                <FG label="Data da Compra"><input className="fi" type="date" value={form.purchase_date||''} onChange={e=>setForm(f=>({...f,purchase_date:e.target.value}))}/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="Tipo de Ponteira">
+                  <select className="fi" value={form.tip_type||''} onChange={e=>setForm(f=>({...f,tip_type:e.target.value,price:TIP_PRICE[e.target.value]||0}))}>
+                    <option value="">— Selecione —</option>
+                    {TIP_TYPES.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </FG>
+                <FG label="Quantidade"><input className="fi" type="number" min="1" value={form.quantity||1} onChange={e=>setForm(f=>({...f,quantity:e.target.value}))}/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="N° de Série(s)"><input className="fi" value={form.serial||''} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Ex: A01697A00-..."/></FG>
+                <FG label="Valor Total (R$)"><input className="fi" type="number" value={form.price||''} onChange={e=>setForm(f=>({...f,price:e.target.value}))}/></FG>
+              </div>
+              <FG label="Observações"><textarea className="fi" rows="2" value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={saveTipPurchase}/>
+            </>}
+
+            {/* ── Auditoria Semanal ── */}
+            {modal==='auditoria' && <>
+              <h2>🔍 Auditoria Semanal de Ponteiras</h2>
+              <div className="form-row">
+                <FG label="Semana (início)"><input className="fi" type="date" value={form.audit_week||''} onChange={e=>setForm(f=>({...f,audit_week:e.target.value}))}/></FG>
+                <FG label="Unidade Auditada">
+                  <select className="fi" value={form.unit||''} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}>
+                    <option value="">— Selecione —</option>
+                    {LOJAS_TIP.filter(l=>l!=='Estoque').map(l=><option key={l}>{l}</option>)}
+                  </select>
+                </FG>
+              </div>
+              <div className="form-row">
+                <FG label="Ponteira">
+                  <select className="fi" value={form.tip_id||''} onChange={e=>{const t=tips.find(x=>x.id===e.target.value);setForm(f=>({...f,tip_id:e.target.value,tip_type:t?.tip_type||''}))}}>
+                    <option value="">— Selecione —</option>
+                    {tips.map(t=><option key={t.id} value={t.id}>{t.tip_type} · {t.serial}</option>)}
+                  </select>
+                </FG>
+                <FG label="Tipo de Ponteira"><input className="fi" value={form.tip_type||''} readOnly style={{opacity:.7}}/></FG>
+              </div>
+              <div className="form-row">
+                <FG label="Serviços Realizados"><input className="fi" type="number" min="0" value={form.services_count||''} onChange={e=>setForm(f=>({...f,services_count:e.target.value}))} placeholder="Qtd de sessões"/></FG>
+                <FG label="Disparos por Sessão"><input className="fi" type="number" min="0" value={form.shots_per_session||''} onChange={e=>setForm(f=>({...f,shots_per_session:e.target.value}))} placeholder="Padrão da sessão"/></FG>
+              </div>
+              <FG label="Disparos Reais Utilizados (contador do equipamento)">
+                <input className="fi" type="number" min="0" value={form.actual_shots||''} onChange={e=>setForm(f=>({...f,actual_shots:e.target.value}))} placeholder="Disparos confirmados"/>
+              </FG>
+              {form.services_count && form.shots_per_session && (
+                <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'8px',padding:'10px 14px',fontSize:'13px',marginBottom:'12px'}}>
+                  <strong>Disparos esperados:</strong> {parseInt(form.services_count||0)*parseInt(form.shots_per_session||0)} shots
+                  {form.actual_shots && <span style={{color: Math.abs(parseInt(form.actual_shots)-parseInt(form.services_count||0)*parseInt(form.shots_per_session||0))/(parseInt(form.services_count||0)*parseInt(form.shots_per_session||0)||1)>0.1?'#ef4444':'#10b981',marginLeft:'12px',fontWeight:'700'}}>
+                    Diferença: {parseInt(form.actual_shots)-(parseInt(form.services_count||0)*parseInt(form.shots_per_session||0))} shots
+                  </span>}
+                </div>
+              )}
+              <FG label="Observações"><textarea className="fi" rows="2" value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></FG>
+              <ModalActions onCancel={()=>setModal(null)} onSave={saveTipAudit}/>
+            </>}
 
             {/* Equipamento */}
             {(modal==='equip') && <>
