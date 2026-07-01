@@ -283,26 +283,35 @@ export default function Dashboard() {
     const tip = tips.find(t => t.id === form.tip_id)
     if (!tip) { showToast('Selecione a ponteira.',true); return }
     if (!form.unit) { showToast('Informe a unidade.',true); return }
-    if (!form.movement_date) { showToast('Informe a data.',true); return }
+    if (!form.movement_date) { showToast('Informe a data de entrada.',true); return }
+    // shots_in = saldo ao chegar (Chegada), shots_out = saldo ao sair (Saída, opcional)
     const shotsIn  = parseInt(form.shots_in) || 0
-    const shotsOut = parseInt(form.shots_out) || 0
-    const newShots = tip.current_shots + shotsIn - shotsOut
+    const shotsOut = form.shots_out !== '' && form.shots_out !== undefined ? parseInt(form.shots_out) : null
+    // O saldo atual é o saldo de saída se preenchido, senão o de chegada
+    const currentBalance = shotsOut !== null ? shotsOut : shotsIn
     const data = {
       tip_id: form.tip_id, movement_date: form.movement_date,
+      date_out: form.date_out || null,
       unit: form.unit, movement_type: form.movement_type || 'Chegada',
-      shots_in: shotsIn, shots_out: shotsOut,
-      shots_balance: newShots, notes: form.notes || '', created_by: user.id
+      shots_in: shotsIn, shots_out: shotsOut !== null ? shotsOut : 0,
+      shots_balance: currentBalance, notes: form.notes || '', created_by: user.id
     }
-    const { error } = await db.tip_movements.insert(data)
+    let error
+    if (form.id) {
+      const res = await db.tip_movements.update(form.id, data); error = res.error
+      if (!error) showToast('Movimentação atualizada!')
+    } else {
+      const res = await db.tip_movements.insert(data); error = res.error
+      if (!error) await addAudit('Movimentação Ponteira','Ponteiras',`${tip.tip_type} → ${form.unit}`)
+    }
     if (error) { showToast('Erro: ' + error.message, true); return }
-    // update tip current shots
-    let newStatus = tip.status
-    if (newShots <= 0) newStatus = 'Zerada'
-    else if (newShots / tip.total_shots <= 0.2) newStatus = 'Alerta'
-    else newStatus = 'Ativa'
-    await db.tips.update(form.tip_id, { current_shots: Math.max(0, newShots), current_unit: form.unit, status: newStatus })
-    await addAudit('Movimentação Ponteira','Ponteiras',`${tip.tip_type} ${form.movement_type} → ${form.unit}`)
-    setModal(null); showToast('Movimentação registrada!'); reload()
+    // Atualiza disparos atuais da ponteira
+    let newStatus = 'Ativa'
+    if (currentBalance <= 0) newStatus = 'Zerada'
+    else if (tip.total_shots > 0 && currentBalance / tip.total_shots <= 0.2) newStatus = 'Alerta'
+    else if (tip.status === 'Reserva') newStatus = 'Reserva'
+    await db.tips.update(form.tip_id, { current_shots: Math.max(0, currentBalance), current_unit: form.unit, status: newStatus })
+    setModal(null); showToast(form.id ? 'Movimentação atualizada!' : 'Movimentação registrada!'); reload()
   }
 
   async function saveTipPurchase() {
@@ -313,10 +322,16 @@ export default function Dashboard() {
       quantity: parseInt(form.quantity) || 1,
       price: parseFloat(form.price) || 0, notes: form.notes || ''
     }
-    const { error } = await db.tip_purchases.insert(data)
+    let error
+    if (form.id) {
+      const res = await db.tip_purchases.update(form.id, data); error = res.error
+      if (!error) showToast('Compra atualizada!')
+    } else {
+      const res = await db.tip_purchases.insert(data); error = res.error
+      if (!error) { await addAudit('Compra Ponteira','Ponteiras',data.purchase_number); showToast('Compra registrada!') }
+    }
     if (error) { showToast('Erro: ' + error.message, true); return }
-    await addAudit('Compra Ponteira','Ponteiras',data.purchase_number)
-    setModal(null); showToast('Compra registrada!'); reload()
+    setModal(null); reload()
   }
 
   async function saveTipAudit() {
@@ -958,10 +973,10 @@ export default function Dashboard() {
           <div>
             {/* KPIs */}
             <div className="kpi-grid" style={{marginBottom:'20px'}}>
-              <KPI icon="💡" value={tips.length} label="Total de Ponteiras" sub="Cadastradas no sistema" color="#6366f1"/>
+              <KPI icon="💡" value={tips.filter(t=>t.status==='Ativa').length} label="Ponteiras Ativas" sub={`${tips.length} total cadastradas`} color="#6366f1"/>
+              <KPI icon="🔄" value={tips.filter(t=>t.status==='Reserva').length} label="Em Reserva" sub="Disponíveis para uso" color="#8b5cf6"/>
               <KPI icon="⚠️" value={tips.filter(t=>tipAlertPct(t)<=0.2&&t.status!=='Zerada').length} label="Em Alerta (≤20%)" sub="Necessitam reposição" color="#f59e0b"/>
               <KPI icon="🔴" value={tips.filter(t=>t.status==='Zerada').length} label="Zeradas" sub="Sem disparos restantes" color="#ef4444"/>
-              <KPI icon="📋" value={tipAudits.filter(a=>a.status==='Pendente').length} label="Auditorias Pendentes" sub="Aguardando preenchimento" color="#0ea5e9"/>
             </div>
 
             {/* Alert banner */}
@@ -996,6 +1011,7 @@ export default function Dashboard() {
                           <th style={{padding:'10px 12px',textAlign:'left',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Tipo</th>
                           <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Total</th>
                           <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Ativas</th>
+                          <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#8b5cf6',borderBottom:'2px solid #e2e8f0'}}>Reserva</th>
                           <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>⚠️ Alerta</th>
                           <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#ef4444',borderBottom:'2px solid #e2e8f0'}}>Zeradas</th>
                           <th style={{padding:'10px 12px',textAlign:'center',fontSize:'12px',fontWeight:'700',color:'#64748b',borderBottom:'2px solid #e2e8f0'}}>Preço Unit.</th>
@@ -1008,11 +1024,15 @@ export default function Dashboard() {
                           const alert = ofType.filter(t=>tipAlertPct(t)<=0.2&&t.status!=='Zerada')
                           const zero = ofType.filter(t=>t.status==='Zerada')
                           const active = ofType.filter(t=>t.status==='Ativa')
+                          const reserva = ofType.filter(t=>t.status==='Reserva')
                           return (
                             <tr key={tt} style={{borderBottom:'1px solid #f1f5f9'}}>
                               <td style={{padding:'12px',fontWeight:'600',fontSize:'13px'}}>{tt}</td>
                               <td style={{padding:'12px',textAlign:'center'}}><span className="badge badge-gray">{ofType.length}</span></td>
                               <td style={{padding:'12px',textAlign:'center'}}><span className="badge badge-success">{active.length}</span></td>
+                              <td style={{padding:'12px',textAlign:'center'}}>
+                                {reserva.length>0 ? <span className="badge badge-info">{reserva.length}</span> : <span style={{color:'#94a3b8',fontSize:'12px'}}>—</span>}
+                              </td>
                               <td style={{padding:'12px',textAlign:'center'}}>
                                 {alert.length>0 ? <span className="badge badge-warning">{alert.length}</span> : <span style={{color:'#94a3b8',fontSize:'12px'}}>—</span>}
                               </td>
@@ -1149,21 +1169,30 @@ export default function Dashboard() {
                 </div>
                 <div className="card" style={{padding:0}}>
                   <div className="table-wrap">
-                    <table><thead><tr><th>Data</th><th>Ponteira</th><th>Tipo</th><th>Unidade</th><th>Chegada</th><th>Saída</th><th>Saldo</th><th>Observações</th></tr></thead>
+                    <table><thead><tr><th>Entrada</th><th>Saída</th><th>Ponteira</th><th>Unidade</th><th>Disparos Chegada</th><th>Disparos Saída</th><th>Utilizados</th><th>Saldo Atual</th><th>Obs</th><th>Ações</th></tr></thead>
                     <tbody>
-                      {tipMovements.map(m=>(
+                      {tipMovements.map(m=>{
+                        const used = m.shots_in > 0 && m.shots_out > 0 ? m.shots_in - m.shots_out : null
+                        return (
                         <tr key={m.id}>
                           <td className="muted">{fmtDate(m.movement_date)}</td>
+                          <td className="muted">{m.date_out ? fmtDate(m.date_out) : <span style={{color:'#94a3b8',fontSize:'11px'}}>Em uso</span>}</td>
                           <td style={{fontSize:'11px',fontFamily:'monospace'}}>{m.tips?.serial||'—'}<br/><span style={{color:'#94a3b8',fontSize:'10px'}}>{m.tips?.tip_type||''}</span></td>
-                          <td><span className={`badge badge-${m.movement_type==='Chegada'?'success':m.movement_type==='Saída'?'warning':'blue'}`}>{m.movement_type}</span></td>
                           <td>{m.unit}</td>
-                          <td style={{color:'#10b981',fontWeight:'600'}}>{m.shots_in>0?'+'+m.shots_in.toLocaleString('pt-BR'):'—'}</td>
-                          <td style={{color:'#ef4444',fontWeight:'600'}}>{m.shots_out>0?'-'+m.shots_out.toLocaleString('pt-BR'):'—'}</td>
+                          <td style={{color:'#10b981',fontWeight:'600'}}>{m.shots_in>0?m.shots_in.toLocaleString('pt-BR'):'—'}</td>
+                          <td style={{color:'#f59e0b',fontWeight:'600'}}>{m.shots_out>0?m.shots_out.toLocaleString('pt-BR'):'—'}</td>
+                          <td style={{color:'#ef4444',fontWeight:'700'}}>{used!==null?used.toLocaleString('pt-BR'):'—'}</td>
                           <td style={{fontWeight:'700'}}>{m.shots_balance?.toLocaleString('pt-BR')??'—'}</td>
                           <td className="muted" style={{fontSize:'11px'}}>{m.notes||'—'}</td>
+                          <td>
+                            <div style={{display:'flex',gap:'4px'}}>
+                              <button className="btn btn-outline btn-sm" onClick={()=>{setForm({...m,shots_out:m.shots_out||''});setModal('newMovement')}}>✏️</button>
+                              <button className="btn btn-danger btn-sm" onClick={async()=>{if(!confirm('Remover movimentação?'))return;await db.tip_movements.delete(m.id);showToast('Removido.');reload()}}>🗑</button>
+                            </div>
+                          </td>
                         </tr>
-                      ))}
-                      {!tipMovements.length && <tr><td colSpan="8" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma movimentação registrada.</td></tr>}
+                      )})}
+                      {!tipMovements.length && <tr><td colSpan="10" style={{textAlign:'center',padding:'32px',color:'#94a3b8'}}>Nenhuma movimentação registrada.</td></tr>}
                     </tbody></table>
                   </div>
                 </div>
@@ -1204,10 +1233,13 @@ export default function Dashboard() {
                           <td><strong>{fmt(p.price)}</strong></td>
                           <td className="muted" style={{fontSize:'11px'}}>{p.notes||'—'}</td>
                           <td>
-                            <button className="btn btn-danger btn-sm" onClick={async()=>{
-                              if(!confirm('Remover compra?')) return
-                              await db.tip_purchases.delete(p.id); showToast('Removido.'); reload()
-                            }}>🗑</button>
+                            <div style={{display:'flex',gap:'4px'}}>
+                              <button className="btn btn-outline btn-sm" onClick={()=>{setForm({...p});setModal('newPurchase')}}>✏️</button>
+                              <button className="btn btn-danger btn-sm" onClick={async()=>{
+                                if(!confirm('Remover compra?')) return
+                                await db.tip_purchases.delete(p.id); showToast('Removido.'); reload()
+                              }}>🗑</button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1341,10 +1373,7 @@ export default function Dashboard() {
                 <FG label="Total de Disparos"><input className="fi" type="number" value={form.total_shots||''} onChange={e=>setForm(f=>({...f,total_shots:e.target.value}))}/></FG>
                 <FG label="Disparos Atuais"><input className="fi" type="number" value={form.current_shots||''} onChange={e=>setForm(f=>({...f,current_shots:e.target.value}))}/></FG>
               </div>
-              <div className="form-row">
-                <FG label="Pedido de Compra"><input className="fi" value={form.purchase_order||''} onChange={e=>setForm(f=>({...f,purchase_order:e.target.value}))} placeholder="Ex: PEDIDO C030_2026"/></FG>
-                <FG label="Data da Compra"><input className="fi" type="date" value={form.purchase_date||''} onChange={e=>setForm(f=>({...f,purchase_date:e.target.value}))}/></FG>
-              </div>
+              <FG label="Pedido de Compra"><input className="fi" value={form.purchase_order||''} onChange={e=>setForm(f=>({...f,purchase_order:e.target.value}))} placeholder="Ex: PEDIDO C030_2026"/></FG>
               <div className="form-row">
                 <FG label="Status">
                   <select className="fi" value={form.status||'Ativa'} onChange={e=>setForm(f=>({...f,status:e.target.value}))}>
@@ -1358,41 +1387,55 @@ export default function Dashboard() {
             </>}
 
             {/* ── Movimentação de Ponteira ── */}
-            {modal==='newMovement' && <>
-              <h2>🔄 Registrar Movimentação</h2>
+            {modal==='newMovement' && (()=>{
+              const tipsForUnit = form.unit ? tips.filter(t=>!t.current_unit||t.current_unit===form.unit||t.current_unit==='Estoque') : tips
+              const selTip = tips.find(t=>t.id===form.tip_id)
+              return <>
+              <h2>{form.id?'✏️ Editar Movimentação':'🔄 Registrar Movimentação'}</h2>
+              <FG label="Loja / Unidade">
+                <select className="fi" value={form.unit||''} onChange={e=>setForm(f=>({...f,unit:e.target.value,tip_id:'',shots_in:'',shots_out:''}))}>
+                  <option value="">— Selecione a unidade primeiro —</option>
+                  {LOJAS_TIP.map(l=><option key={l}>{l}</option>)}
+                </select>
+              </FG>
+              <FG label="Ponteira">
+                <select className="fi" value={form.tip_id||''} onChange={e=>{
+                  const t=tips.find(x=>x.id===e.target.value)
+                  setForm(f=>({...f,tip_id:e.target.value,shots_in:t?t.current_shots:'',shots_out:''}))
+                }} disabled={!form.unit}>
+                  <option value="">— Selecione —</option>
+                  {tipsForUnit.map(t=><option key={t.id} value={t.id}>{t.tip_type} · {t.serial} ({t.current_shots?.toLocaleString('pt-BR')} disp.) {t.status==='Reserva'?'[RESERVA]':''}</option>)}
+                </select>
+              </FG>
+              {selTip && (
+                <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'8px',padding:'8px 12px',fontSize:'12px',marginBottom:'12px',color:'#166534'}}>
+                  Saldo atual: <strong>{selTip.current_shots?.toLocaleString('pt-BR')} disparos</strong> · Status: {selTip.status}
+                </div>
+              )}
               <div className="form-row">
-                <FG label="Ponteira">
-                  <select className="fi" value={form.tip_id||''} onChange={e=>setForm(f=>({...f,tip_id:e.target.value}))}>
-                    <option value="">— Selecione —</option>
-                    {tips.map(t=><option key={t.id} value={t.id}>{t.tip_type} · {t.serial} ({t.current_shots?.toLocaleString('pt-BR')} disp.)</option>)}
-                  </select>
-                </FG>
-                <FG label="Tipo">
-                  <select className="fi" value={form.movement_type||'Chegada'} onChange={e=>setForm(f=>({...f,movement_type:e.target.value}))}>
-                    {['Chegada','Saída','Auditoria'].map(t=><option key={t}>{t}</option>)}
-                  </select>
-                </FG>
+                <FG label="Data de Entrada (Chegada)"><input className="fi" type="date" value={form.movement_date||''} onChange={e=>setForm(f=>({...f,movement_date:e.target.value}))}/></FG>
+                <FG label="Data de Saída (opcional)"><input className="fi" type="date" value={form.date_out||''} onChange={e=>setForm(f=>({...f,date_out:e.target.value}))}/></FG>
               </div>
               <div className="form-row">
-                <FG label="Unidade">
-                  <select className="fi" value={form.unit||''} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}>
-                    <option value="">— Selecione —</option>
-                    {LOJAS_TIP.map(l=><option key={l}>{l}</option>)}
-                  </select>
+                <FG label="Disparos na Chegada (saldo ao entrar)">
+                  <input className="fi" type="number" min="0" value={form.shots_in||''} onChange={e=>setForm(f=>({...f,shots_in:e.target.value}))} placeholder="Ex: 9.184"/>
                 </FG>
-                <FG label="Data"><input className="fi" type="date" value={form.movement_date||''} onChange={e=>setForm(f=>({...f,movement_date:e.target.value}))}/></FG>
+                <FG label="Disparos na Saída (saldo ao sair — opcional)">
+                  <input className="fi" type="number" min="0" value={form.shots_out||''} onChange={e=>setForm(f=>({...f,shots_out:e.target.value}))} placeholder="Ex: 4.113"/>
+                </FG>
               </div>
-              <div className="form-row">
-                <FG label="Disparos de Chegada"><input className="fi" type="number" min="0" value={form.shots_in||''} onChange={e=>setForm(f=>({...f,shots_in:e.target.value}))} placeholder="0"/></FG>
-                <FG label="Disparos de Saída"><input className="fi" type="number" min="0" value={form.shots_out||''} onChange={e=>setForm(f=>({...f,shots_out:e.target.value}))} placeholder="0"/></FG>
-              </div>
+              {form.shots_in && form.shots_out && parseInt(form.shots_in)>0 && parseInt(form.shots_out)>=0 && (
+                <div style={{background:'#fef3c7',border:'1px solid #fcd34d',borderRadius:'8px',padding:'8px 12px',fontSize:'12px',marginBottom:'12px',color:'#92400e'}}>
+                  Disparos utilizados: <strong>{(parseInt(form.shots_in)-parseInt(form.shots_out)).toLocaleString('pt-BR')}</strong>
+                </div>
+              )}
               <FG label="Observações"><textarea className="fi" rows="2" value={form.notes||''} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}/></FG>
               <ModalActions onCancel={()=>setModal(null)} onSave={saveTipMovement}/>
-            </>}
+            </>})()}
 
             {/* ── Compra de Ponteira ── */}
             {modal==='newPurchase' && <>
-              <h2>🛒 Registrar Compra de Ponteira</h2>
+              <h2>{form.id?'✏️ Editar Compra':'🛒 Registrar Compra de Ponteira'}</h2>
               <div className="form-row">
                 <FG label="N° do Pedido"><input className="fi" value={form.purchase_number||''} onChange={e=>setForm(f=>({...f,purchase_number:e.target.value}))} placeholder="Ex: PEDIDO C031_2026"/></FG>
                 <FG label="Data da Compra"><input className="fi" type="date" value={form.purchase_date||''} onChange={e=>setForm(f=>({...f,purchase_date:e.target.value}))}/></FG>
