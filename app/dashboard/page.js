@@ -1141,15 +1141,17 @@ export default function Dashboard() {
                       </div>
                       <div className="card" style={{padding:0,borderRadius:'0 0 10px 10px',borderTop:'none'}}>
                         <div className="table-wrap">
-                          <table><thead><tr><th>Tipo</th><th>N° Série</th><th>% Restante</th><th>Disparos</th><th>Status</th><th>Unidade Atual</th><th>Pedido</th><th>Ações</th></tr></thead>
+                          <table><thead><tr><th>Ponteira / N° Série</th><th>% Restante</th><th>Disparos</th><th>Status</th><th>Unidade Atual</th><th>Pedido</th><th>Ações</th></tr></thead>
                           <tbody>
                             {allTips.length ? allTips.map(t=>{
                               const pct = tipAlertPct(t)
                               const barColor = t.status==='Zerada'?'#ef4444':pct<=0.2?'#f59e0b':'#10b981'
                               return (
                                 <tr key={t.id} style={pct<=0.2?{background:'#fffbeb'}:{}}>
-                                  <td><strong>{t.tip_type}</strong></td>
-                                  <td style={{fontSize:'11px',fontFamily:'monospace',color:'#475569'}}>{t.serial}</td>
+                                  <td>
+                                    <div style={{fontWeight:'700',fontSize:'14px',color:'#1e293b'}}>{t.tip_type}</div>
+                                    <div style={{fontSize:'11px',fontFamily:'monospace',color:'#94a3b8',marginTop:'2px'}}>{t.serial}</div>
+                                  </td>
                                   <td>
                                     <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                                       <div style={{background:'#e2e8f0',borderRadius:'4px',height:'8px',width:'80px',flexShrink:0}}>
